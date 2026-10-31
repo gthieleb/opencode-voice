@@ -78,11 +78,11 @@
 - [x] 0.6 Publish **Model & Agent Checkpoint M0**: actual discovered models, selected assignments, missing capabilities, alternatives, cost guardrails, users' decision where needed. Gate implementation on M0.
 
 ## 0b. Mandatory test execution environment selection (before T1; tasks 0.7–0.12, formerly 0b.1–0b.6)
-- [ ] 0.7 [was 0b.1] Detect Docker/Podman availability, host OS, CPU architecture, audio hardware requirements, CI platform and target OpenCode frontend networking.
-- [ ] 0.8 [was 0b.2] Compare host-installed Node Playwright Test, official version-pinned Playwright Test image, and official Playwright MCP container **separately**; inspect existing repo test dependencies. Recommend containerized Chromium E2E by default for reproducibility, but keep test runner language TypeScript/Node and reuse repo dependency manager.
+- [x] 0.7 [was 0b.1] Detect Docker/Podman availability, host OS, CPU architecture, audio hardware requirements, CI platform and target OpenCode frontend networking.
+- [x] 0.8 [was 0b.2] Compare host-installed Node Playwright Test, official version-pinned Playwright Test image, and official Playwright MCP container **separately**; inspect existing repo test dependencies. Recommend containerized Chromium E2E by default for reproducibility, but keep test runner language TypeScript/Node and reuse repo dependency manager.
 - [ ] 0.9 [was 0b.3] Prove fixture injection using actual WAV file in container-mounted path with Chromium fake-microphone flags; validate sample format, loop/stop behavior, permissions, `localhost`/host-gateway networking, WebSocket and artifact mount access.
 - [ ] 0.10 [was 0b.4] Smoke-check official MCP Docker image: can installed MCP version pass Chromium launch args/config and mounted fixture paths? If not, use Playwright Test Docker for audio E2E and Playwright MCP for UI smoke; do not claim direct audio-input support without evidence.
-- [ ] 0.11 [was 0b.5] Decide host vs container strategy and pin image digest/tag, npm package version and fixtures; write decision to `test-runtime-decision.md`, evidence to `test-evidence.md`, and propose Dockerfiles/Compose **only if justified**. Avoid Python Playwright unless repository needs Python; no blanket host package installs.
+- [x] 0.11 [was 0b.5] Decide host vs container strategy and pin image digest/tag, npm package version and fixtures; write decision to `test-runtime-decision.md`, evidence to `test-evidence.md`, and propose Dockerfiles/Compose **only if justified**. Avoid Python Playwright unless repository needs Python; no blanket host package installs.
 - [ ] 0.12 [was 0b.6] **Runtime Checkpoint R0**: working prototype of fake mic/fixture and documented image/security/reproducibility tradeoff. No T1/T2 progress without R0 outcome (or documented approved blocker).
 
 ## 7. Optional A1 — agent promotion to global OpenCode (at T3/B or T5/D)

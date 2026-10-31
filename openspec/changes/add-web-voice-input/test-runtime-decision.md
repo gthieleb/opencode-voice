@@ -1,39 +1,49 @@
-# Test runtime ADR — Playwright and audio (R0)
+# Test runtime decision (R0) — 2026-10-31
 
-Status: PROPOSED; NOT TESTED. Owner: integration/debugger agent. Decision at R0.
+## Environment facts (probed 2026-10-31)
 
-## Options
+| Probe | Result |
+| --- | --- |
+| Docker / Podman | **NOT INSTALLED** (`docker`: command not found, `podman`: absent) |
+| Host OS / arch | linux x86_64, 2 CPU, 15 GB RAM |
+| Node | v24.22.1 (npm 12.2.1) |
+| `@playwright/test` | 1.64.1 added as devDependency; `npx playwright install chromium` ✔ → chromium-1248 + headless shell in `~/.cache/ms-playwright` |
+| Chromium launch | ✖ fails: `libnspr4.so` missing (OS-level browser deps); `npx playwright install-deps` fails: `sudo` blocked by `no-new-privileges` flag in this shell |
+| OpenCode voice repo runtime | plain ESM JS, `node --test`, oxlint/oxfmt, no TS toolchain |
 
-| Option | Browser/test engine | Pros | Cons | Recommended use |
-| --- | --- | --- | --- | --- |
-| Host Node + @playwright/test | Host Chromium | Fast edit/debug; easier local browser | Host browser dependencies/versions vary | Local development fallback |
-| Official `mcr.microsoft.com/playwright:v<version>-noble` | Docker Chromium + existing repo TS tests | Pinned reproducible browser and OS dependencies, CI-compatible | Need package install, mount fixtures, network to OpenCode | **Default audio E2E** after proof |
-| Official `mcr.microsoft.com/playwright/mcp` | Docker MCP / headless Chromium | Existing upstream MCP packaging; good interactive UI smoke | Separate tool, headless-only per upstream docs; audio launch flags/fixtures must be tested | UI smoke; optional audio proof |
-| Custom combined browser+Whisper+Piper image | Docker browser and native ML tools | Full environment reproducibility | Heavy images; architecture risk, model mounts, hardware dependence | Only if base alternatives fail |
+## Options compared (task 0b.2)
 
-## Default decision
+| Option | Status | Notes |
+| --- | --- | --- |
+| (2) Official pinned Playwright Test image (container) | **BLOCKED: no docker/podman on host** | would be the reproducible default per spec; requires container runtime install (user approval) |
+| (3) Official Playwright MCP Docker image | **BLOCKED: no docker** | task 0b.4 smoke unanswerable until a container runtime exists |
+| (1) Host Node Playwright Test runner | **PARTIAL** | binaries ✔, config + fixture + spec authored; only OS system libs missing (one sudo command) |
 
-Start with **TypeScript Playwright Test in pinned official browser image** and independent Playwright MCP container for interactive smoke. Preserve existing whisper.cpp/Piper runtime. Do not introduce Python Playwright packages. Docker is an execution environment, not a substitute for the repo's npm dependencies or actual audio test fixtures.
+## Decision (provisional, pending user input on blocked items)
 
-## Verification checklist
-- [ ] Inspect installed Docker/Podman, repo package manager and existing test config
-- [ ] Match image version to installed Playwright version, pin image digest when practical
-- [ ] Container sees mounted WAV fixture at absolute path, no privileged host sound device
-- [ ] Chromium fake audio configuration and microphone permission work
-- [ ] Browser accesses OpenCode frontend and protected voice WebSocket across container network
-- [ ] Audio passes transcription to editable draft; ensure no premature session submission
-- [ ] Playwright MCP official image separately tested with same fixture: supported / unsupported / unknown
-- [ ] Output screenshots/logs/benchmark artifacts exported from container
-- [ ] Running containers and model processes cleaned up
+**Primary: Host Node Playwright Test 1.64.1 (option 1), pinned via package.json devDependency.**
+Rationale: only immediately available option; keeps tests in the repo's existing Node/esm tooling (no TS added — config + specs authored as ESM JS); containerization postponed, not abandoned.
 
-## References
-- https://playwright.dev/docs/docker
-- https://github.com/microsoft/playwright-mcp#docker
-- https://opencode.ai/docs/agents
-- https://opencode.ai/docs/models
+**Deliberately deferred (needs user go):**
+- Docker or podman install → would re-open options (2)/(3) for reproducible Chromium E2E (recommended later — reproduce matrix from official Playwright image digest once available).
+- MCP-container audio smoke (0b.4) unanswerable until then; contract: any containerization of E2E lands only as a separate decision with digest pinning.
 
-## Result (fill during R0)
-- Tested versions/images: NOT RUN
-- Working audio-injection approach: NOT RUN
-- Selected option and rationale: PENDING
-- User approval / blocker: PENDING
+Artifacts produced for the POC (option 1), reusable either way:
+- `tests/e2e/fixtures/make-fixture.js` → deterministic mono 16 kHz 16-bit WAV tone fixture (`german-tone-fixture.wav`), no model dependency
+- `tests/e2e/poc-fake-mic.spec.js` → enumDevices + getUserMedia + MediaRecorder (1.5 s) proof spec
+- `playwright.config.js` → headless Chromium with exactly the pinned flags: `--use-fake-device-for-media-stream`, `--use-fake-ui-for-media-stream`, `--use-file-for-fake-audio-capture=<wav>`, `--autoplay-policy=no-user-gesture-required`
+
+## Blocker B1 (T2 needs it): Chromium OS libs on host
+
+Blocked by privileges; user must run once (their shell/sudo):
+`sudo npx playwright install-deps chromium` (or minimal `sudo apt-get install -y libnspr4 libnss3 …`).
+Evidence after: rerun `FIXTURE_WAV=$PWD/tests/e2e/fixtures/german-tone-fixture.wav npx playwright test poc-fake-mic` — expect 1 passing test with `stage: recorded` result and non-trivial `bytes`.
+
+## R0 checkpoint status
+
+- 0b.1 ✔ (docker absent, host facts captured)
+- 0b.2 ✔ compared (table above), decision: host-first + later-optional container
+- 0b.3 ⏳ fixture/config/spec ready; execution blocked on B1
+- 0b.4 ✖ blocked (no docker) — revisit only if user installs a runtime
+- 0b.5 ✔ decision + artifacts written (this file)
+- 0b.6 🟡 R0 checkpoint partially reached: fake-mic POC demonstrable **after B1**; T2 blocked until then, T1 (pure Node/WS/STT contract) MAY proceed in parallel — B1 is a browser-only blocker
