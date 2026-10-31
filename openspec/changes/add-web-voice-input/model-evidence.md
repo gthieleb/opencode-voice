@@ -22,15 +22,22 @@ Status: **M0 MEASURED (smoke level), tasks NOT RUN**. Populate per-task rows onl
 | huggingface/Qwen/Qwen3.8-27B (user's default) | ✔ OK (correct ID is `huggingface/Qwen/Qwen3.8-27B`, not `huggingface/Qwen3.8-27B` or unprefixed) |
 | huggingface/Qwen/Qwen3-VL-30B-A3B-Instruct | ✔ OK (multimodal candidate for screenshot work) |
 | huggingface/zai-org/GLM-5.3-Flash | ✔ OK |
-| ollama-cloud/glm-5.3 + deepseek-v4.1-flash:1017 | ✗ monthly usage limit reached (quota) |
-| alibaba-token-plan/* (any) | ✗ "Access to model denied" — **per user decision (2026-10-31): alibaba provider is excluded entirely and may not be used for any task.** |
+| huggingface/zai-org/GLM-4.7-Flash (L1) | ✔ OK, tool-call ✔ ("scripts.test") |
+| ollama-cloud/* | ✗ monthly usage limit reached (Stand 31.10.) — **provider decision (M0): ollama-cloud re-enters repertoire from 1. 11. (quota reset)**, then backup/upgrade route for L2/L3 |
+| alibaba-token-plan/* (any) | ✗ "Access to model denied" — **user decision (2026-10-31): alibaba provider entirely excluded, may not be used for any task.** |
+
+### Provider policy (M0, user decisions 2026-10-31)
+
+- Allowed providers: **`huggingface`** and **`opencode-go` (session mainline)** only; user decision — **no alibaba/no zai native (zai/)**.
+- `huggingface/zai-org/*` counts as **huggingface** (HF-hosted) and remains permitted.
+- **No ollama-cloud tasks before 1. 11. 2026** (quota exhausted); from 1. 11. again available as backup/upgrade route for L2/L3.
 
 ### M0 tier assignment (bound into `.opencode/agents/*.md` frontmatter)
 
 | Agent | Tier | Bound model ID | Evidence |
 | --- | --- | --- | --- |
 | voice-docs-fixtures | L0 | `huggingface/Qwen/Qwen3-8B` | smoke ✔, tool-call ✔, `bash: deny`, `edit: deny` |
-| voice-cheap-coder | L1 | `zai/glm-4.5-flash` | smoke ✔, tool-call ✔; replaces unavailable spec-default `Qwen3-Coder-30B-A3B-Instruct` |
+| voice-cheap-coder | L1 | `huggingface/zai-org/GLM-4.7-Flash` | smoke ✔, tool-call ✔; replaces unavailable spec-default `Qwen3-Coder-30B-A3B-Instruct` |
 | voice-integration-debugger | L2 | `huggingface/Qwen/Qwen3.8-27B` | smoke ✔ (27B general), backup `huggingface/zai-org/GLM-5.3-Flash` |
 | voice-independent-reviewer | L3 | `huggingface/zai-org/GLM-5.3-Flash` | smoke ✔; `edit: deny`, `bash: ask`; strongest verified available |
 
