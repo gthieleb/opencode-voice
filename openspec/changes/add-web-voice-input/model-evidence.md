@@ -23,6 +23,7 @@ Status: **M0 MEASURED (smoke level), tasks NOT RUN**. Populate per-task rows onl
 | huggingface/Qwen/Qwen3-VL-30B-A3B-Instruct | ✔ OK (multimodal candidate for screenshot work) |
 | huggingface/zai-org/GLM-5.3-Flash | ✔ OK |
 | huggingface/zai-org/GLM-4.7-Flash (L1) | ✔ OK, tool-call ✔ ("scripts.test") |
+| huggingface/meta-llama/Llama-3.1-8B-Instruct (user probe 2026-10-31) | ✗ **REJECTED for agent routing**: 3 probes — trivial reply ✔; package.json tool task ✗ (0 tool calls, hallucinated `project.json` + fabricated "edit function" answer); context-tail echo/timeout artifacts. L0 stays Qwen3-8B. |
 | ollama-cloud/* | ✗ monthly usage limit reached (Stand 31.10.) — **provider decision (M0): ollama-cloud re-enters repertoire from 1. 11. (quota reset)**, then backup/upgrade route for L2/L3 |
 | alibaba-token-plan/* (any) | ✗ "Access to model denied" — **user decision (2026-10-31): alibaba provider entirely excluded, may not be used for any task.** |
 
