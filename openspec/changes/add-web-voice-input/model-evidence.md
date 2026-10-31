@@ -42,7 +42,7 @@ Status: **M0 MEASURED (smoke level), tasks NOT RUN**. Populate per-task rows onl
 | voice-independent-reviewer | L3 | `huggingface/zai-org/GLM-5.3-Flash` | smoke ✔; `edit: deny`, `bash: ask`; strongest verified available |
 
 - Smoke invocation of bound agent: `opencode run --agent voice-docs-fixtures …` executed with visible header `voice-docs-fixtures · Qwen/Qwen3-8B` and successful tool use ✔.
-- Missing capability: no verified local/cheap **coder** model (toolcalling) — L1 duty shifts to `zai/glm-4.5-flash`; if quality fails at Gate A/B, user can enable a provider (ollama credits / local) rather than silently expanding access (per spec).
+- Missing capability: no verified local/cheap **coder** model (toolcalling) — L1 duty shifts to `huggingface/zai-org/GLM-4.7-Flash`; if quality fails at Gate A/B, user can enable a provider (ollama credits from 1.11. / local) rather than silently expanding access (per spec).
 - Cost guardrails: L4 (e.g. anthropic/claude-opus-*) catalog viewable but NOT enabled/invoked; any L4 requires explicit user approval at Gate B/D.
 - Cost per task: cost metering unavailable in CLI output so far → recorded as UNKNOWN, attempts counted instead.
 
