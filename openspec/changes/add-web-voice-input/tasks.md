@@ -4,8 +4,8 @@
 - [x] 1.1 Clone and pin current opencode-voice and OpenCode commits; capture runtime versions.
 - [x] 1.2 Read `AGENTS.md`, source entry points, test inventory, scripts and benchmarking tools; identify existing STT/TTS abstractions.
 - [x] 1.3 Run original test suite and lint; record baseline failures and coverage.
-- [ ] 1.4 Inspect current OpenCode GUI extension API and composer source; document supported injection point and fallback path.
-- [ ] 1.5 Audit exact Icon/IconButton exports, icon catalog entries, asset sources, licenses, and dark/light themes.
+- [x] 1.4 Inspect current OpenCode GUI extension API and composer source; document supported injection point and fallback path.
+- [x] 1.5 Audit exact Icon/IconButton exports, icon catalog entries, asset sources, licenses, and dark/light themes.
 
 ## Checkpoint A — Architecture decision (approval required before UI implementation; tasks 1.6–1.8, formerly A.1–A.3)
 - [ ] 1.6 [was A.1] Share inventory: reusable opencode-voice functions, original test results, OpenCode GUI composer injection evidence, native icon mappings.
