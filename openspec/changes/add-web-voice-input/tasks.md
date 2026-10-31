@@ -1,9 +1,9 @@
 # Tasks
 
 ## 1. Baseline / inventory
-- [ ] 1.1 Clone and pin current opencode-voice and OpenCode commits; capture runtime versions.
-- [ ] 1.2 Read `AGENTS.md`, source entry points, test inventory, scripts and benchmarking tools; identify existing STT/TTS abstractions.
-- [ ] 1.3 Run original test suite and lint; record baseline failures and coverage.
+- [x] 1.1 Clone and pin current opencode-voice and OpenCode commits; capture runtime versions.
+- [x] 1.2 Read `AGENTS.md`, source entry points, test inventory, scripts and benchmarking tools; identify existing STT/TTS abstractions.
+- [x] 1.3 Run original test suite and lint; record baseline failures and coverage.
 - [ ] 1.4 Inspect current OpenCode GUI extension API and composer source; document supported injection point and fallback path.
 - [ ] 1.5 Audit exact Icon/IconButton exports, icon catalog entries, asset sources, licenses, and dark/light themes.
 

@@ -1,0 +1,5 @@
+# Meta directories: OpenSpec workflow artifacts and local agent tooling.
+# Formatting them is not required for CI (package code only) and risks
+# mangling OpenSpec/frontmatter structures.
+.opencode/
+openspec/
