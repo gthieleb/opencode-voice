@@ -1,3 +1,8 @@
+---
+slug: add-web-voice-input
+createdAt: 2026-10-31
+---
+
 # Proposal: Web voice input for opencode-voice
 
 ## Why
