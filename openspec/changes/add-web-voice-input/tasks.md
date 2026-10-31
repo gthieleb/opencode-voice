@@ -8,9 +8,9 @@
 - [x] 1.5 Audit exact Icon/IconButton exports, icon catalog entries, asset sources, licenses, and dark/light themes.
 
 ## Checkpoint A — Architecture decision (approval required before UI implementation; tasks 1.6–1.8, formerly A.1–A.3)
-- [ ] 1.6 [was A.1] Share inventory: reusable opencode-voice functions, original test results, OpenCode GUI composer injection evidence, native icon mappings.
-- [ ] 1.7 [was A.2] Present recommended minimal integration and fallback, including any upstream patch, and explicitly request user approval before adopting a fork/patch.
-- [ ] 1.8 [was A.3] Record decision and constraints in `checkpoints.md`.
+- [x] 1.6 [was A.1] Share inventory: reusable opencode-voice functions, original test results, OpenCode GUI composer injection evidence, native icon mappings.
+- [x] 1.7 [was A.2] Present recommended minimal integration and fallback, including any upstream patch, and explicitly request user approval before adopting a fork/patch.
+- [x] 1.8 [was A.3] Record decision and constraints in `checkpoints.md`.
 
 ## 2. Minimal implementation
 - [ ] 2.1 Extract narrow shared transcription interface only if required; preserve TUI behavior and fallback.

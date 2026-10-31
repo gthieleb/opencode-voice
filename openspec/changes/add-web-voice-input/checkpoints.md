@@ -9,7 +9,21 @@ This document defines user-visible review gates for `add-web-voice-input`. Tasks
 | C — Quality | After Piper + Playwright test suite | Repeatable audio E2E, raw/normalized comparison, WER/CER/technical-term report, error and session tests | Ask for 5–10 real German developer prompts; consent to retain fixtures; agree release thresholds |
 | D — Release | After CI and docs | Test results, compatibility matrix, security and accessibility review, proposed PR diff | Release go/no-go and explicit upstream PR decision |
 
+## Gate A decision — RECORDED 2026-10-31
+
+**Decision: PATH A — plugin-only, no OpenCode patch/fork for MVP.** (User approval, single word "A".)
+
+- Web UI built as an **OpenCode GUI plugin** (`@opencode/plugin/gui`): a `ComposerPill` ("Voice", reactive state icon) with a custom popover (`menu(input)`) using `ctx.ui` components (IconButton etc.) for record/stop/cancel and the editable-composer flow; composer draft written via `ctx.screen.current()?.composer.setText/insert`.
+- Mic icon shipped as plugin-owned MIT inline SVG (catalog has no `mic`/`record`/`play`; use native `waveform` for level meter).
+- Manual submit stays the user's action in the existing native composer send; no auto-submit.
+- No footer-row parity, no `ComposerEditorActionSlot`, no fork in MVP. Upstream patch/PR remains an optional post-MVP item at Gate D (tasks 4.3/4.5), never automatic.
+- Evidence: `evidence/t0-inventory.md` (verified against `anomalyco/opencode` dev @ dc4775a6; PRs #59469/#59764; risk note: young API, MVP spike validates `ComposerPill` + `composer.setText` on the pinned web build before building the real voice surface).
+- Design.md integration strategy adjusted accordingly (patch escalation only on spike failure, with evidence).
+
+**Gate A cross-check (T0 artifact):** `test-evidence.md` T0 entry recorded; baseline green 20/20; Meta-ignores via `.prettierignore` explain check-greens on imported docs.
+
 ## MVP acceptance criteria
+
 
 1. Works in the target `opencode serve` web frontend without altering the existing TUI flow.
 2. An accessible microphone control appears beside the prompt field, using verified OpenCode-native icon and visual conventions where possible.
