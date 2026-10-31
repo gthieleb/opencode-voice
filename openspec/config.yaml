@@ -1,0 +1,14 @@
+schema: spec-driven
+context: |
+  Extend renjfk/opencode-voice with web input while preserving existing STT/TTS pipelines,
+  TUI commands, configuration and backward compatibility.
+  Target is the OpenCode served web frontend; use native OpenCode UI conventions.
+  Apply cost-first routing in `openspec/changes/add-web-voice-input/model-routing.md`.
+  L4 premium calls require user approval; never imply that OpenSpec automatically switches models.
+rules:
+  tasks:
+    - Every new task states its intended L0-L4 model tier and an executable acceptance check.
+    - Include model escalation and test-evidence updates at each checkpoint.
+    - Before implementation perform M0 model/provider/agent availability discovery; never guess model IDs.
+    - Before browser/audio tests perform R0 host vs Playwright Test image vs MCP Docker evaluation.
+    - Prefer existing pipeline and TypeScript Playwright; do not add Python Playwright without a demonstrated need.
