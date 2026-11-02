@@ -633,3 +633,107 @@ test("inactivity: silent connection is closed with 4004", async () => {
   c.close();
   await env.t.close();
 });
+
+// tmpDir nested under a regular file: mkdir fails (warned), every write fails
+test("temp-write failure: replies the fixed safe message without leaking paths", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "voice-transport-"));
+  fs.writeFileSync(path.join(tmpDir, "blocker"), "x"); // regular file, not a dir
+  const t = createVoiceTransport({
+    port: 0,
+    token: TOKEN,
+    allowedOrigins: [ORIGIN],
+    kv: KV,
+    client: null,
+    logger: null,
+    opts: { tmpDir: path.join(tmpDir, "blocker", "sub") },
+  });
+  envs.push({ t, tmpDir });
+  if (!t.server.listening) await new Promise((r) => t.server.once("listening", r));
+  const c = new Conn(t.url(), { token: TOKEN, origin: ORIGIN });
+  await c.send({ type: "recording.start", id: "w1", codec: "audio/wav", sampleRate: 16000 });
+  await c.next((m) => m.type === "recording.ready");
+  await c.sendBinary(makeWav());
+  await c.send({ type: "recording.finish", id: "w1" });
+
+  const e = await c.next((m) => m.type === "transcription.error");
+  assert.equal(e.code, "STT_ERROR");
+  assert.equal(e.safeMessage, "failed to write temp clip");
+  // no fs path fragments in the whole client-visible reply
+  const raw = JSON.stringify(e);
+  assert.ok(!raw.includes("/tmp"), "absolute tmp path leaked into error reply");
+
+  // connection survives: a later recording still negotiates
+  await c.send({ type: "recording.start", id: "w2", codec: "audio/wav", sampleRate: 16000 });
+  await c.next((m) => m.type === "recording.ready");
+  c.close();
+  await t.close();
+});
+
+test("temp permissions: written with mode 0o600 (linux)", async () => {
+  if (process.platform !== "linux") return;
+  const perms = [];
+  const env = await makeEnv({
+    opts: {
+      transcribe: async (kvArg, o) => {
+        perms.push(fs.statSync(o.wavPath).mode & 0o777);
+        return { text: "perms" };
+      },
+    },
+  });
+  const c = new Conn(env.url, { token: TOKEN, origin: ORIGIN });
+  await c.send({ type: "recording.start", id: "p1", codec: "audio/wav", sampleRate: 16000 });
+  await c.next((m) => m.type === "recording.ready");
+  await c.sendBinary(makeWav());
+  await c.send({ type: "recording.finish", id: "p1" });
+  await c.next((m) => m.type === "transcription.final");
+  assert.deepEqual(perms, [0o600]);
+  c.close();
+  await env.t.close();
+});
+
+test("oversize id echo: client-controlled ids are clamped to MAX_ID_LENGTH", async () => {
+  const BIG = "e".repeat(400);
+  const env = await makeEnv({});
+  const c = new Conn(env.url, { token: TOKEN, origin: ORIGIN });
+
+  // unknown message type echoes the id
+  await c.send({ type: "bogus.type", id: BIG });
+  let e = await c.next((m) => m.type === "transcription.error");
+  assert.equal(e.code, "PROTOCOL");
+  assert.ok(e.recordingId.length <= 100, "unknown-type echo not clamped");
+
+  // cancel with an unknown over-length id -> UNKNOWN_ID echoes it clamped
+  // (the canceled ack only ever carries a validated id)
+  await c.send({ type: "recording.cancel", id: BIG });
+  e = await c.next((m) => m.type === "transcription.error");
+  assert.equal(e.code, "UNKNOWN_ID");
+  assert.ok(e.recordingId.length <= 100, "unknown-id echo not clamped");
+
+  c.close();
+  await env.t.close();
+});
+
+test("STT_ERROR: fixes the safe message, never forwards the transcriber error", async () => {
+  const env = await makeEnv({
+    opts: {
+      transcribe: async () => {
+        throw new Error("SECRET-STT-BLOWUP /home/gun/secret/path.wav");
+      },
+    },
+  });
+  const c = new Conn(env.url, { token: TOKEN, origin: ORIGIN });
+  await c.send({ type: "recording.start", id: "s1", codec: "audio/wav", sampleRate: 16000 });
+  await c.next((m) => m.type === "recording.ready");
+  await c.sendBinary(makeWav());
+  await c.send({ type: "recording.finish", id: "s1" });
+  await c.next((m) => m.type === "transcription.started");
+
+  const e = await c.next((m) => m.type === "transcription.error");
+  assert.equal(e.code, "STT_ERROR");
+  assert.equal(e.safeMessage, "transcription failed");
+  const raw = JSON.stringify(e);
+  assert.ok(!raw.includes("SECRET-STT-BLOWUP"), "injected error text leaked to client");
+  assert.ok(!raw.includes("/home/gun"), "fs path leaked to client");
+  c.close();
+  await env.t.close();
+});
