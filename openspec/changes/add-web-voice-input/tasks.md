@@ -13,7 +13,7 @@
 - [x] 1.8 [was A.3] Record decision and constraints in `checkpoints.md`.
 
 ## 2. Minimal implementation
-- [ ] 2.1 Extract narrow shared transcription interface only if required; preserve TUI behavior and fallback.
+- [x] 2.1 Extract narrow shared transcription interface only if required; preserve TUI behavior and fallback.
 - [ ] 2.2 Build authenticated, origin-restricted, bounded same-origin voice transport; reuse existing Whisper/STT adapter.
 - [ ] 2.3 Implement browser media capture, codec adaptation and stop/cancel cleanup.
 - [ ] 2.4 Add native-looking microphone button and states to supported composer extension point.
@@ -27,7 +27,7 @@
 - [ ] 2.10 [was B.4] Do not expand to streaming/VAD or major refactoring before MVP review; record go/no-go decision.
 
 ## 3. Tests and quality
-- [ ] 3.1 Extend existing unit/integration tests for TUI regression, session isolation, fallback and audio validation.
+- [x] 3.1 Extend existing unit/integration tests for TUI regression, session isolation, fallback and audio validation.
 - [ ] 3.2 Prepare at least 20 Piper-generated German coding utterance fixtures, references and provenance; expand to 50–100 after first pass.
 - [ ] 3.3 Execute Playwright Test browser E2E with fake microphone WAV; check draft versus actual submitted session message.
 - [ ] 3.4 Verify Playwright MCP audio-input flags in installed server version and record repeatable configuration.
