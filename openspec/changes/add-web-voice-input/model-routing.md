@@ -12,7 +12,16 @@ Status: PLANNED, not benchmarked. This is project policy for agent assignment, *
 | L3 | Verified strong coding model (e.g. Claude Sonnet) | Architecture review, security, cross-layer debugging, final independent review | Review separately from implementation where feasible |
 | L4 | Verified premium reasoning model (e.g. Claude Opus) | Critical unresolved security/architecture issues | Requires user approval before API-cost exposure |
 
-Names are **candidate families, not guaranteed model IDs or cheapest current providers**. Benchmark local and hosted offerings on real repository tasks before pinning. Qwen3-Coder-30B-A3B has 30.5B total / ~3.3B activated parameters. Do not confuse total parameters with memory footprint or price. The user-mentioned `Qwen3.8-27B` is not the routing default until an actual provider ID and tool-use performance are verified.
+Names are **candidate families, not guaranteed model IDs or cheapest current providers**. Benchmark local and hosted offerings on real repository tasks before pinning.
+
+**L0/L1 next-iteration evaluation candidates (user-added 2026-11-02):**
+| Candidate (user cost est., io per 1M) | Planned tier | Entry criterion (two-part smoke) | Evidence slot |
+| --- | --- | --- | --- |
+| Qwen2.5-7B-Instruct (~$0.04 / $0.10) | L0 candidate (better German, structured JSON, native tool calling) | (1) trivial reply without prompt-echo; (2) real tool task with verified tool call and exact output | `model-evidence.md` next-iteration section |
+| Llama-3.2-3B-Instruct (~$0.02 / $0.02) | L0/L1 efficiency candidate (distilled, fast, native tool calling) | same; plus German/English mixed-term discipline check | same |
+
+Do not confuse total parameters with memory footprint or price. Both are **NOT AVAILABLE** on enabled providers as of 2026-11-02 (huggingface catalog lacks both IDs; ollama-cloud quota still exhausted past its November 1 expected reset — recheck date unknown). Promotion requires recorded pass of the smoke, not cost figures alone.
+
 
 ## Task assignment matrix
 

@@ -33,6 +33,19 @@ Status: **M0 MEASURED (smoke level), tasks NOT RUN**. Populate per-task rows onl
 - `huggingface/zai-org/*` counts as **huggingface** (HF-hosted) and remains permitted.
 - **No ollama-cloud tasks before 1. 11. 2026** (quota exhausted); from 1. 11. again available as backup/upgrade route for L2/L3.
 
+### Next-iteration evaluation candidates (added 2026-11-02, user request)
+
+| Candidate | Status on enabled providers (huggingface only) | Evaluation gate before promotion |
+| --- | --- | --- |
+| Qwen2.5-7B-Instruct (user cost est. ~$0.04/$0.10 per 1M io) | ✖ not in huggingface catalog (only `Qwen2.5-Coder-32B` = known broken tool parser); path: ollama model tag or HF catalog availability — **must pass the same two-part smoke before any L0 family promotion** (a ok-prompt + a tool task like `package.json scripts.test`) | tool-call ✔ + no context echo |
+| Llama-3.2-3B-Instruct (user cost est. ~$0.02/$0.02 per 1M io) | ✖ not in catalog (only nvidia/meta 3.2-11b/90b vision variants); Llama-3.1-8B already **rejected** on tool-calling quality (see above) — 3.2-3B is more likely to be able to call tools but MUST be verified, not assumed | same two-part smoke; additionally: mixed German/English echo discipline |
+
+Both candidates stay **EVALUATION-ONLY** until the two-part smoke passes. Known prerequisite friction:
+- ollama-cloud quota still exhausted after 2026-11-01 calendar change → user-side throttle; recheck date unknown (not the 1st).
+- Neither model currently selectable via huggingface; adding a provider model override is a user-config change with its own approval, NOT something agents do silently.
+
+If either passes, its natural landing spot is **L0 (docs/fixtures)** in model-routing.md — not automatic; promotion needs Gate A-level user confirmation recorded here.
+
 ### M0 tier assignment (bound into `.opencode/agents/*.md` frontmatter)
 
 | Agent | Tier | Bound model ID | Evidence |
