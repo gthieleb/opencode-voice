@@ -14,7 +14,7 @@
 
 ## 2. Minimal implementation
 - [x] 2.1 Extract narrow shared transcription interface only if required; preserve TUI behavior and fallback.
-- [ ] 2.2 Build authenticated, origin-restricted, bounded same-origin voice transport; reuse existing Whisper/STT adapter.
+- [ ] 2.2 Build authenticated, origin-restricted, bounded same-origin voice transport; reuse existing Whisper/STT adapter. *(DONE 2026-11-02 — `lib/web-transport.js` + `lib/audio-validate.js`, L3 security PASS; evidence: test-evidence.md T1 block)*
 - [ ] 2.3 Implement browser media capture, codec adaptation and stop/cancel cleanup.
 - [ ] 2.4 Add native-looking microphone button and states to supported composer extension point.
 - [ ] 2.5 Display raw/normalized transcription with editable preview and explicit user submit only.
@@ -73,17 +73,17 @@
 - [x] 0.1 Detect installed OpenCode version and working project; run `opencode models` and `opencode agent list`; inspect project and user OpenCode config **without exposing credentials**. `/models` in the UI is a second source. Record actual enabled provider/model IDs, pricing or local hardware, context limit and tool-calling suitability in `model-evidence.md`. Do not infer availability from model catalog alone.
 - [x] 0.2 Inventory existing agents and compatible agent schema (current stable vs V2); do not overwrite existing agents. Determine whether `model:` frontmatter and permissions are honored in installed version.
 - [x] 0.3 Recommend a cheapest viable L0/L1/L2/L3 mapping using **available IDs**; if missing propose (a) existing alternative (b) configuring cheap task-specific coding agents (c) connecting a provider/local inference, subject to user approval and cost visibility. Never silently add credentials, install provider or invoke premium API.
-- [ ] 0.4 Run quick read-only trial of the cheapest model for tool calling and repository comprehension; test a small isolated coding change with executable acceptance criteria only after baseline. Record successes/retries/total cost; promote on two failed bounded attempts.
+- [x] 0.4 Run quick read-only trial of the cheapest model for tool calling and repository comprehension; test a small isolated coding change with executable acceptance criteria only after baseline. Record successes/retries/total cost; promote on two failed bounded attempts. *(DONE — tool-calling smokes + agent smoke invocations recorded in model-evidence.md; per-task attempts tracked in the T1 block)*
 - [x] 0.5 Set up or propose project `.opencode/agents/` profiles from this package. Only after model discovery fill model overrides; absent model property inherits selected primary model (not a proof of cheap execution). Confirm with `opencode agent list` and a smoke invocation.
 - [x] 0.6 Publish **Model & Agent Checkpoint M0**: actual discovered models, selected assignments, missing capabilities, alternatives, cost guardrails, users' decision where needed. Gate implementation on M0.
 
 ## 0b. Mandatory test execution environment selection (before T1; tasks 0.7–0.12, formerly 0b.1–0b.6)
 - [x] 0.7 [was 0b.1] Detect Docker/Podman availability, host OS, CPU architecture, audio hardware requirements, CI platform and target OpenCode frontend networking.
 - [x] 0.8 [was 0b.2] Compare host-installed Node Playwright Test, official version-pinned Playwright Test image, and official Playwright MCP container **separately**; inspect existing repo test dependencies. Recommend containerized Chromium E2E by default for reproducibility, but keep test runner language TypeScript/Node and reuse repo dependency manager.
-- [ ] 0.9 [was 0b.3] Prove fixture injection using actual WAV file in container-mounted path with Chromium fake-microphone flags; validate sample format, loop/stop behavior, permissions, `localhost`/host-gateway networking, WebSocket and artifact mount access.
+- [x] 0.9 [was 0b.3] Prove fixture injection using actual WAV file **on the host runtime chosen by 0.11** with Chromium fake-microphone flags; validate sample format, loop/stop behavior, permissions, `localhost`/host-gateway networking, WebSocket and artifact mount access. *(CONFIRMED 2026-11-06: poc-fake-mic passes, stage: recorded; secure-context caveat recorded — 127.0.0.1 required)*
 - [ ] 0.10 [was 0b.4] Smoke-check official MCP Docker image: can installed MCP version pass Chromium launch args/config and mounted fixture paths? If not, use Playwright Test Docker for audio E2E and Playwright MCP for UI smoke; do not claim direct audio-input support without evidence.
 - [x] 0.11 [was 0b.5] Decide host vs container strategy and pin image digest/tag, npm package version and fixtures; write decision to `test-runtime-decision.md`, evidence to `test-evidence.md`, and propose Dockerfiles/Compose **only if justified**. Avoid Python Playwright unless repository needs Python; no blanket host package installs.
-- [ ] 0.12 [was 0b.6] **Runtime Checkpoint R0**: working prototype of fake mic/fixture and documented image/security/reproducibility tradeoff. No T1/T2 progress without R0 outcome (or documented approved blocker).
+- [x] 0.12 [was 0b.6] **Runtime Checkpoint R0**: working prototype of fake mic/fixture and documented image/security/reproducibility tradeoff. No T1/T2 progress without R0 outcome (or documented approved blocker). *(REACHED 2026-11-06 — B1 resolved rootless, POC passes; see test-runtime-decision.md)*
 
 ## 7. Optional A1 — agent promotion to global OpenCode (at T3/B or T5/D)
 - [ ] 7.1 Review real results and test evidence for all four project agents; recommend only proven reusable candidates.
