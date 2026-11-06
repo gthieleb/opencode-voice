@@ -20,14 +20,16 @@
   },
   "files": [
     "index.js",
-    "lib"
+    "lib",
+    "gui"
   ],
   "type": "module",
   "main": "index.js",
   "exports": {
     "./tui": {
       "import": "./index.js"
-    }
+    },
+    "./gui-experimental": "./gui/gui-experimental.cjs"
   },
   "scripts": {
     "lint": "npx oxlint .",
