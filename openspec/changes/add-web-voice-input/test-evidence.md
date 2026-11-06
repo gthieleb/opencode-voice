@@ -42,4 +42,20 @@ Agent task 1.1 + 1.2 + 1.3 inventory source locations: see tasks 1.4/1.5 researc
 | Test totals | 63/63 pass (`node --test`), `npm run check` green, `openspec validate --strict` valid |
 | Models used | implementers: opencode-go/glm-5.3-flash (2.1), huggingface GLM-4.7-Flash (4b, 4d), huggingface Qwen3.8-27B (4c); reviewers: huggingface Qwen3.8-27B (2.1), opencode-go GLM-5.3-Flash (4b, 4d re-review), huggingface GLM-5.3-Flash (4c L3) — cost UNKNOWN (free-tier), attempts 1 each |
 | STILL OPEN for T1 full exit | real German/English mixed-term integration through a REAL STT backend: whisper-cli not installed on host (blocker B-block-2) and no STT API credentials; fetch-stubbed contract tests cover pipeline semantics in the meantime. Also TUI runtime regression in a real opencode TUI session not yet run (only unit-level identity). |
-| B1 (browser OS libs) | still open — blocks T2 (tasks 2.3–2.5 + Playwright browser smoke) |
+| B1 (browser OS libs) | **RESOLVED (2026-11-06) without sudo** — rootless `apt-get download` + `dpkg -x` of 16 system libs into `/tmp/opencode/pw-libs/extracted`; Playwright runs need `LD_LIBRARY_PATH=/tmp/opencode/pw-libs/extracted/usr/lib/x86_64-linux-gnu` (volatile path, exact command in `test-runtime-decision.md`) |
+
+### R0 + T2 gate-in (2026-11-06) — blocker B1 resolved, fake-mic POC passes
+
+| Item | Result |
+| --- | --- |
+| B1 resolution | rootless lib install: libnspr4, libnss3(+nssutil), libatk1.0-0t64, libatk-bridge2.0-0t64, libatspi2.0-0t64, libasound2t64, libgbm1, libxkbcommon0, libXcomposite1, libXdamage1, libXfixes3, libXrandr2, libxrender1, libxi6, libxres1, libXrender deps → all launch errors gone (`ldd` clean) |
+| Secure-context finding | headless shell treats `data:` URLs as NOT secure (`navigator.mediaDevices` undefined) — POC spec rewritten to serve a throwaway page from `http://127.0.0.1` (always secure in Chromium); future E2E specs must do the same |
+| Fake-mic POC | ✔ **PASS**: `LD_LIBRARY_PATH=… FIXTURE_WAV=$PWD/tests/e2e/fixtures/german-tone-fixture.wav npx playwright test poc-fake-mic` → 1/1 passed, `stage: recorded`, non-trivial byte count — fixture injection via `--use-fake-*` flags PROVEN on host |
+| tasks 0.9 / 0.12 | ✔ R0 checkpoint COMPLETE (host-first runtime; container variant remains a documented deferred option) |
+| Task 0.4 (M0 model trial) | ✔ recorded in `model-evidence.md` (Qwen3-8B read-only tool-calling probe; Llama-3.1-8B rejected for agent routing) |
+| T1 residual | unchanged: real-STT-backend integration + TUI runtime regression still open (tracked above) |
+| Test totals | 63/63 `node --test` unchanged; `npm run check` green after POC spec fix |
+
+| Gate | Status | Evidence / execution environment | Decision |
+|---|---|---|---|
+| T2 — Browser smoke | **gate-in open** | E2E specs must use 127.0.0.1 secure-context pattern + LD_LIBRARY_PATH contract | T2 (tasks 2.3–2.5) may proceed |

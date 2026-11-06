@@ -35,15 +35,51 @@ Artifacts produced for the POC (option 1), reusable either way:
 
 ## Blocker B1 (T2 needs it): Chromium OS libs on host
 
-Blocked by privileges; user must run once (their shell/sudo):
-`sudo npx playwright install-deps chromium` (or minimal `sudo apt-get install -y libnspr4 libnss3 …`).
-Evidence after: rerun `FIXTURE_WAV=$PWD/tests/e2e/fixtures/german-tone-fixture.wav npx playwright test poc-fake-mic` — expect 1 passing test with `stage: recorded` result and non-trivial `bytes`.
+**RESOLVED 2026-11-06, rootless.** `sudo` stayed unavailable (`no-new-privileges`);
+the libraries were materialized as unprivileged Debian packages instead:
+
+```bash
+mkdir -p /tmp/opencode/pw-libs/debs /tmp/opencode/pw-libs/extracted
+cd /tmp/opencode/pw-libs/debs
+for p in libnspr4 libnss3 libatk1.0-0t64 libatk-bridge2.0-0t64 libxcomposite1 \
+         libxdamage1 libxfixes3 libxrandr2 libgbm1 libxkbcommon0 libasound2t64 \
+         libatspi2.0-0t64 libxrender1 libxi6 libxres1; do
+  apt-get download "$p"
+done
+for d in *.deb; do dpkg -x "$d" /tmp/opencode/pw-libs/extracted/; done
+```
+
+Run any Playwright invocation with:
+
+```bash
+LD_LIBRARY_PATH=/tmp/opencode/pw-libs/extracted/usr/lib/x86_64-linux-gnu \
+FIXTURE_WAV=$PWD/tests/e2e/fixtures/german-tone-fixture.wav npx playwright test <spec>
+```
+
+- `/tmp/opencode/pw-libs` is volatile (cleared on reboot/eviction) — re-run the
+  snippet above when the path is empty; the package set is also recorded in
+  `test-evidence.md` (R0 gate-in block, 2026-11-06).
+- Caveat: pinned Playwright chromium builds are validated against distro
+  `install-deps` sets; if a future chromium bump introduces new missing libs,
+  extend the `apt-get download` list (find them with
+  `ldd <chromium binary> | grep 'not found'`).
+
+**Second root cause fixed:** the POC spec used `about:blank`, which is not a
+secure context, so `navigator.mediaDevices` is `undefined` regardless of launch
+flags (this build also treats `data:` URLs as unsecure). The spec now serves a
+throwaway page from `http://127.0.0.1:<ephemeral>` — secure in Chromium.
+
+**Evidence after resolution (2026-11-06):** the command above runs
+`poc-fake-mic` → **1 passed** with `stage: recorded` and non-trivial `bytes`;
+`ldd` against the chromium binary shows no missing libraries.
 
 ## R0 checkpoint status
 
 - 0b.1 ✔ (docker absent, host facts captured)
 - 0b.2 ✔ compared (table above), decision: host-first + later-optional container
-- 0b.3 ⏳ fixture/config/spec ready; execution blocked on B1
+- 0b.3 ✔ **COMPLETE (2026-11-06)** — fixture injection PROVEN on host: POC
+  passes with `stage: recorded` after B1 + secure-context fixes (test-evidence.md)
 - 0b.4 ✖ blocked (no docker) — revisit only if user installs a runtime
 - 0b.5 ✔ decision + artifacts written (this file)
-- 0b.6 🟡 R0 checkpoint partially reached: fake-mic POC demonstrable **after B1**; T2 blocked until then, T1 (pure Node/WS/STT contract) MAY proceed in parallel — B1 is a browser-only blocker
+- 0b.6 ✔ **R0 checkpoint REACHED (2026-11-06)**: working fake-mic/fixture
+  prototype passing; T2 unblocked.
