@@ -292,24 +292,45 @@ async function startIsolatedServer() {
 }
 
 function waitForServerReady(child) {
+  // Both pipes are drained for the child's whole lifetime: `opencode serve`
+  // logs heavily (plugin entries, watcher lines, per-request structured
+  // logs), and an unread pipe backpressures the child once the 64KB OS
+  // buffer fills, so the server would block on write and the test would
+  // hang until Playwright kills it. A ring of recent output (stdout +
+  // stderr) doubles as the diagnostic payload for the early-exit/timeout
+  // paths.
+  const recent = [];
+  let recentLen = 0;
+  const pushRecent = (chunk) => {
+    const text = chunk.toString();
+    recent.push(text);
+    recentLen += text.length;
+    while (recentLen > 64_000 && recent.length > 1) {
+      recentLen -= recent.shift().length;
+    }
+  };
   return new Promise((resolve, reject) => {
+    let ready = false;
     let buf = "";
-    const timer = setTimeout(() => {
-      reject(new Error(`opencode serve did not start within 30s; output:\n${buf}`));
-    }, 30_000);
+    let timer;
     const onOut = (chunk) => {
+      pushRecent(chunk);
+      if (ready) return;
       buf += chunk.toString();
       if (buf.includes("server listening")) {
+        ready = true;
         clearTimeout(timer);
-        child.stdout.off("data", onOut);
         resolve(buf);
       }
     };
-    child.stdout.on("data", onOut);
-    child.on("exit", (code) => {
+    const fail = (message) => {
       clearTimeout(timer);
-      reject(new Error(`opencode serve exited early (code ${code}); output:\n${buf}`));
-    });
+      reject(new Error(`${message}; output:\n${recent.join("")}`));
+    };
+    timer = setTimeout(() => fail("opencode serve did not start within 30s"), 30_000);
+    child.stdout.on("data", onOut);
+    child.stderr.on("data", pushRecent);
+    child.on("exit", (code) => fail(`opencode serve exited early (code ${code})`));
   });
 }
 
