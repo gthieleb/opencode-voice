@@ -15,7 +15,7 @@
 ## 2. Minimal implementation
 - [x] 2.1 Extract narrow shared transcription interface only if required; preserve TUI behavior and fallback.
 - [ ] 2.2 Build authenticated, origin-restricted, bounded same-origin voice transport; reuse existing Whisper/STT adapter. *(DONE 2026-11-02 — `lib/web-transport.js` + `lib/audio-validate.js`, L3 security PASS; evidence: test-evidence.md T1 block)*
-- [ ] 2.3 Implement browser media capture, codec adaptation and stop/cancel cleanup.
+- [x] 2.3 Implement browser media capture, codec adaptation and stop/cancel cleanup. *(DONE 2026-11-07 — `gui/gui-experimental.cjs` sections `__audio`/`__capture`/`__ws`/`__browser`; Node contract + real-transport integration `tests/w52-capture-contract.test.js`; Chromium fake-mic stop/cancel proof `tests/e2e/w52-capture.spec.js`; evidence: test-evidence.md W5.2 block, report `.superpowers/sdd/plan/task-w52-report.md`)*
 - [ ] 2.4 Add native-looking microphone button and states to supported composer extension point.
 - [ ] 2.5 Display raw/normalized transcription with editable preview and explicit user submit only.
 - [ ] 2.6 Document configuration, supported browsers, permissions, deployment and reverse-proxy requirements.
