@@ -22,8 +22,9 @@
 //              server validation error pass-through, and cancel semantics.
 //
 // The __browser glue section is browser-only (references navigator,
-// AudioContext, MediaRecorder inside function bodies) and is asserted for
-// shape only.
+// AudioContext, MediaRecorder inside function bodies). One cancel race is
+// Node-driven with fake browser globals (cancel in the decode window); the
+// rest is asserted for shape only and proven in the fake-mic e2e.
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -675,6 +676,165 @@ test("ws client: cancel before the socket opens tears down quietly", async () =>
   assert.equal(results.length, 0);
   assert.equal(errors.length, 0);
   await env.t.close();
+});
+
+// --- __browser glue: cancel in the decode window (fix round 1) --------------------
+//
+// processRecording awaits blob.arrayBuffer() and decodeAudioData() before it
+// may call createVoiceWsClient; the glue's own WebSocket dep is injectable,
+// so the injected class is the connection attempt itself:
+// createVoiceWsClient constructs it synchronously the moment the glue
+// reaches the upload. Recording (and throwing) on construction proves
+// "no connection attempt" — the transport therefore never sees a
+// recording.start either.
+
+function installFakeBrowser({ decodePromise }) {
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const track = {
+    stopped: false,
+    stop() {
+      this.stopped = true;
+    },
+  };
+  const fakeStream = { getTracks: () => [track] };
+  const blob = {
+    size: 16000,
+    arrayBufferCalled: false,
+    arrayBuffer: async () => {
+      blob.arrayBufferCalled = true;
+      return new ArrayBuffer(16);
+    },
+  };
+  let ctxClosed = false;
+  let decodeCalled = false;
+  class FakeAudioContext {
+    close() {
+      ctxClosed = true;
+    }
+    decodeAudioData() {
+      decodeCalled = true;
+      return decodePromise;
+    }
+  }
+  class FakeMediaRecorder {
+    static isTypeSupported() {
+      return false;
+    }
+    constructor() {
+      this.state = "inactive";
+    }
+    start() {
+      this.state = "recording";
+      if (this.ondataavailable) this.ondataavailable({ data: blob });
+    }
+    stop() {
+      this.state = "inactive";
+      if (this.onstop) this.onstop();
+    }
+  }
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    enumerable: true,
+    value: { mediaDevices: { getUserMedia: async () => fakeStream } },
+  });
+  globalThis.AudioContext = FakeAudioContext;
+  globalThis.MediaRecorder = FakeMediaRecorder;
+  return {
+    flags: {
+      get arrayBufferCalled() {
+        return blob.arrayBufferCalled;
+      },
+      get decodeCalled() {
+        return decodeCalled;
+      },
+      get trackStopped() {
+        return track.stopped;
+      },
+      get ctxClosed() {
+        return ctxClosed;
+      },
+    },
+    uninstall() {
+      Object.defineProperty(globalThis, "navigator", originalNavigator);
+      delete globalThis.AudioContext;
+      delete globalThis.MediaRecorder;
+    },
+  };
+}
+
+test("glue: cancel in the decode window -> late decode never opens a socket", async () => {
+  const { startBrowserCapture } = (await loadBundleExports()).__browser;
+
+  // Controllable decode promise = the decode window: cancel() lands while
+  // decodeAudioData is pending, and the promise only resolves afterwards,
+  // so the continuation must notice `canceled` before it may upload.
+  let resolveDecode;
+  const decodePromise = new Promise((r) => {
+    resolveDecode = r;
+  });
+  // Late, fully valid decode result: 500 ms 440 Hz mono @ 16 kHz — within
+  // every preflight limit, so without the guard the continuation would
+  // encode, preflight-pass and create the client.
+  const n = 8000;
+  const mono = new Float32Array(n);
+  for (let i = 0; i < n; i++) mono[i] = Math.sin((2 * Math.PI * 440 * i) / 16000) * 0.8;
+  const fakeAudioBuffer = {
+    numberOfChannels: 1,
+    length: n,
+    sampleRate: 16000,
+    getChannelData: () => mono,
+  };
+
+  const wsConstructions = [];
+  class RecordingWebSocket {
+    constructor(href) {
+      wsConstructions.push(href);
+      throw new Error("connection attempt after cancel");
+    }
+  }
+
+  const fake = installFakeBrowser({ decodePromise });
+  try {
+    const states = [];
+    const results = [];
+    const errors = [];
+    const handle = startBrowserCapture({
+      WebSocket: RecordingWebSocket,
+      url: "ws://127.0.0.1:4096",
+      token: TOKEN,
+      onStateChange: (s) => states.push(s),
+      onResult: (r) => results.push(r),
+      onError: (e) => errors.push(e),
+    });
+
+    await waitFor(() => handle.getState() === "recording", { label: "recording" });
+    handle.stop();
+    await waitFor(() => fake.flags.decodeCalled, { label: "decode window open" });
+    assert.equal(
+      fake.flags.arrayBufferCalled,
+      true,
+      "cancel must land AFTER the arrayBuffer await, in the decode window",
+    );
+    handle.cancel();
+
+    assert.equal(wsConstructions.length, 0, "no connection while decode is pending");
+    assert.equal(handle.getState(), "idle");
+
+    // The late decode result now arrives; the continuation runs but must
+    // stop at the guard — no socket, no upload, no callback.
+    resolveDecode(fakeAudioBuffer);
+    await sleep(80);
+
+    assert.equal(wsConstructions.length, 0, "late decode must not open a socket");
+    assert.equal(handle.getState(), "idle", "final state stays idle");
+    assert.deepEqual(states, ["permission", "recording", "transcribing", "idle"]);
+    assert.equal(results.length, 0, "no result for a canceled capture");
+    assert.equal(errors.length, 0, "no error surfaced by a canceled capture");
+    assert.equal(fake.flags.trackStopped, true, "mic track released on cancel");
+    assert.equal(fake.flags.ctxClosed, true, "AudioContext closed on cancel");
+  } finally {
+    fake.uninstall();
+  }
 });
 
 test("ws client: programming deps throw; unparseable wav reports INVALID_WAV", async () => {

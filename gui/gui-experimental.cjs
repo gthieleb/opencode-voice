@@ -863,6 +863,11 @@ function startBrowserCapture(deps) {
       failCapture(code, err && err.message ? err.message : "audio processing failed");
       return;
     }
+    // A cancel() landing in the decode window (arrayBuffer/decodeAudioData
+    // still pending) already set `canceled`, fired CANCELED and cleaned up;
+    // the late decode result must not open a socket and upload the clip the
+    // user canceled.
+    if (canceled) return;
     try {
       client = createVoiceWsClient({
         WebSocket: WSImpl,
