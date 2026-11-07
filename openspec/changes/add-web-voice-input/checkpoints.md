@@ -22,6 +22,36 @@ This document defines user-visible review gates for `add-web-voice-input`. Tasks
 
 **Gate A cross-check (T0 artifact):** `test-evidence.md` T0 entry recorded; baseline green 20/20; Meta-ignores via `.prettierignore` explain check-greens on imported docs.
 
+## Gate A amendment — vehicle ruling (RECORDED 2026-11-07, user decision)
+
+**Spike W5.1 finding F2 (load-bearing):** on pinned v2.2.5 — and on latest
+dev `0.0.0-dev-904` (probed 2026-11-06 in an isolated instance) — the served
+**web app has no plugin bridge**: GUI plugin bundles are served
+(`/api/plugin/gui` → 200) but window entries never evaluate; the composer
+pill row renders empty. GUI-plugin windows are **desktop-only** on
+config plugins (SDK docs confirm: "A plugin from the config runs only in the
+desktop app"). The web bundle already ships the consumer/evaluator machinery
+— only the host-context bridge property is missing (evidence chain in
+`test-evidence.md` W5.1 block + W5.1 report; regression-pinned in
+`tests/e2e/w51-spike.spec.js`).
+
+**Decision (user, 2026-11-07): HYBRID.**
+- PATH A stays: plugin-only, no OpenCode patch/fork.
+- W5.2/W5.3 code is **vehicle-agnostic**: targets the verified bridge API,
+  contract-tested in Node (real bundle through the app's CJS evaluator);
+  runs unmodified on desktop today and on web the moment the bridge lands.
+- **Upstream unblock:** issue filed at `anomalyco/opencode` —
+  **https://github.com/anomalyco/opencode/issues/62561** (full evidence
+  package + minimal-fix direction). No fork.
+- No desktop app on this machine → W5.4 demo path is two-layer:
+  (L1) audio-pipeline browser E2E in plain Chromium (capture client + real
+  sidecar + STT stub) runnable now; (L2) app-integration E2E (pill/draft)
+  gated on a web-bridge release or a desktop install; the F2 pin flips when
+  either becomes available.
+- Gate B (MVP demo) therefore demonstrates: L1 audio pipeline + contract
+  surface + regression pin; the in-app web demo is explicitly a
+  release-gated item, recorded at Gate B.
+
 ## MVP acceptance criteria
 
 

@@ -66,7 +66,8 @@ If either passes, its natural landing spot is **L0 (docs/fixtures)** in model-ro
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | M0 discovery/binding | Qwen3-8B, glm-4.5-flash, Qwen3.8-27B, GLM-5.3-Flash | huggingface / zai | 12 probes | UNKNOWN | UNKNOWN | UNKNOWN (free-tier smoke) | tool-call smokes pass | NONE | UNASSIGNED |
 | T0 baseline | NOT RUN | UNKNOWN | 0 | UNKNOWN | UNKNOWN | UNKNOWN | NOT RUN | NONE | UNASSIGNED |
-| T1 transport | NOT RUN | UNKNOWN | 0 | UNKNOWN | UNKNOWN | UNKNOWN | NOT RUN | NONE | UNASSIGNED |
+| T1 transport | glm-5.3-flash (opencode-go, 2.1), GLM-4.7-Flash (4b, 4d), Qwen3.8-27B (4c) | opencode-go / huggingface | 3 (+L3 hardening) | UNKNOWN | UNKNOWN | UNKNOWN (free-tier) | 63/63 + L3 security PASS | NONE (L3 review ×2) | Qwen3.8-27B / GLM-5.3-Flash (L3) |
+| W5.1 GUI spike | Qwen3.8-27B (L2 voice-integration-debugger) | huggingface | 1 (+1 isolation follow-up) | UNKNOWN | UNKNOWN | UNKNOWN (free-tier) | e2e 1/1, node 66/66, check green | NONE — DONE_WITH_CONCERNS, product boundary F2 adjudicated at Gate A amendment | GLM-5.3-Flash (L3, pending) |
 | T2 browser | NOT RUN | UNKNOWN | 0 | UNKNOWN | UNKNOWN | UNKNOWN | NOT RUN | NONE | UNASSIGNED |
 | T3 MVP | NOT RUN | UNKNOWN | 0 | UNKNOWN | UNKNOWN | UNKNOWN | NOT RUN | NONE | UNASSIGNED |
 | T4 speech | NOT RUN | UNKNOWN | 0 | UNKNOWN | UNKNOWN | UNKNOWN | NOT RUN | NONE | UNASSIGNED |
