@@ -80,6 +80,8 @@ const FONTS_CONF_XML = `<?xml version="1.0"?>
 `;
 
 function assertBrowserContract() {
+  // container run (E2E_HOST=1): the pinned image ships its own os libs, so the host /tmp/opencode/pw-libs contract can never hold there
+  if (process.env.E2E_HOST === "1") return;
   if (!fs.existsSync(`${PW_LIB_DIR}/libnspr4.so`)) {
     throw new Error(
       "headless-chromium OS libraries missing (volatile /tmp/opencode/pw-libs was cleared). Re-materialize per the recipe in tests/e2e/w51-spike.spec.js header, then re-run.",

@@ -33,8 +33,7 @@ const allowedOrigins = (
     ? DEFAULT_ORIGINS
     : process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
 ).filter(Boolean);
-// empty list only ever comes from an explicit empty env: the transport then
-// denies no-origin (non-browser) clients, matching allowNoOrigin=false
+// explicit empty ALLOWED_ORIGINS falls through to the transport's DEFAULT_ALLOWED_ORIGINS (localhost/127.0.0.1:4096); only clients without an Origin header are denied (allowNoOrigin=false)
 const effectiveOrigins = allowedOrigins.length > 0 ? allowedOrigins : [];
 
 const tmpDir = process.env.VOICE_TMPDIR || "/tmp";

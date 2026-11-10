@@ -146,10 +146,12 @@ if [ "$mode" = "--poc-only" ]; then
   # even for the POC; opencode-web is NOT started (spec is self-contained)
   compose up -d voice-sidecar
   trap 'compose rm -sf voice-sidecar >/dev/null 2>&1 || true' EXIT
+  # rc captured so record_digests runs even on a red test run
+  rc=0
   compose run --rm --no-deps e2e \
-    bash -lc "npm ci --no-audit --no-fund && npx playwright test tests/e2e/poc-fake-mic.spec.js"
+    bash -lc "npm ci --no-audit --no-fund && npx playwright test tests/e2e/poc-fake-mic.spec.js" || rc=$?
   record_digests
-  exit 0
+  exit "$rc"
 fi
 
 if [ "$PROVIDER" = "none" ]; then
@@ -157,6 +159,9 @@ if [ "$PROVIDER" = "none" ]; then
   exit 1
 fi
 
-compose run --rm e2e
+# rc captured so record_digests runs even on a red test run
+rc=0
+compose run --rm e2e || rc=$?
 record_digests
 log "done; web ui (manual browser checks): http://localhost:${WEB_PORT}/ (user opencode / e2e-voice-secret)"
+exit "$rc"

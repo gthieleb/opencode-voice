@@ -24,6 +24,10 @@ flags:
 | `--down`     | stop + remove the stack                                                                                                                           |
 | `--clean`    | `--down` + remove the built sidecar image (the pinned playwright image stays cached)                                                              |
 
+A full run leaves the stack up: `compose run --rm e2e` only removes the test
+container itself, while `opencode-web` + `voice-sidecar` keep running (`--down`
+removes them).
+
 The wrapper probes a compose driver (`podman compose` provider, then
 `podman-compose`); if neither exists it prints the three explicit
 `podman run` commands to execute by hand.
@@ -50,7 +54,10 @@ The wrapper probes a compose driver (`podman compose` provider, then
   (`enumerateDevices` / `getUserMedia` / `MediaRecorder` produce non-silent
   audio from `tests/e2e/fixtures/german-tone-fixture.wav`).
 - `tests/e2e/w52-capture.spec.js` — capture contract against the real
-  `createVoiceTransport` in-process (start/finish → `transcription.final`).
+  `createVoiceTransport` in-process (start/finish → `transcription.final`);
+  its host OS-lib gate (`assertBrowserContract()`) early-returns on
+  `E2E_HOST=1` — the `/tmp/opencode/pw-libs` contract cannot hold inside the
+  pinned image — so the spec runs in the container like the POC spec.
 - `tests/e2e/w51-spike.spec.js` — **skipped in the container** (`E2E_HOST=1`
   branch in `playwright.config.js`): it spawns the host `opencode` binary and
   needs the host OS-lib workaround, which the container must not rely on.
