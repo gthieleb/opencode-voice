@@ -84,3 +84,14 @@ Agent task 1.1 + 1.2 + 1.3 inventory source locations: see tasks 1.4/1.5 researc
 | Chromium fake-mic proof | `tests/e2e/w52-capture.spec.js` (2 tests, pinned browser image, R-B1 `LD_LIBRARY_PATH`+`FONTCONFIG_FILE` contract, `--use-fake-*` flags from `playwright.config.js`, fixture `german-tone-fixture.wav`): page evaluates the FULL bundle under the host's exact `Function("require","module","exports")` contract (real ids inert-stubbed), then drives `startBrowserCapture` against a real in-process sidecar that allows **only the page's own origin** (real browser Origin header, no allowNoOrigin). **Stop path:** states exactly `permission→recording→transcribing→ready`, stubbed raw+normalized result, finite timings, transcriber ran on `voice-<connId>-web-<uuid>.wav`. **Cancel path:** `permission→recording→idle`, nothing transcribed (deterministic), and a second capture afterwards reaches ready (cleanup proven). 2/2 passed, stable across 2 runs. |
 | Playwright MCP limitation (documented) | Audio tested via Playwright Test + pinned image, not the `playwright` MCP server: the MCP-managed browser does not inherit the rootless host OS-library contract (Chromium FATALs in Skia font backend without it; no launch-args/env hook in installed version). MCP remains usable for non-audio browser work. |
 | Tests / gates | `npm run test` 81/81 (66 baseline + 15); `npm run check` 0 errors (1 pre-existing warning); `npx openspec validate add-web-voice-input --strict` valid; W5.1 e2e regression green with grown bundle (3/3 playwright passed). Frozen files untouched; no new product listening port. |
+
+### R0.2 container stack (2026-11-10, commits bee371d + d608e62)
+
+| Item | Result |
+| --- | --- |
+| User decision | container-first for further tests: OpenCode web v2 image + pinned Playwright image (podman) |
+| Stack | `test/e2e/compose.yaml`: opencode-web (`guarnacciaa/opencode-v2:2.0.29`, digest sha256:8164568c…, newer 2.2.7 noted as bump-ready), voice-sidecar (node:24-slim, real `createVoiceTransport` + FAKE_TRANSCRIBE=1, live smoke: ready→started→final with German mixed stub), e2e (`mcr.microsoft.com/playwright:1.64.1-noble`, shares sidecar netns → `ws://127.0.0.1:9100`) |
+| Runner | `test/e2e/run-container.sh` (podman compose → podman-compose fallback → printed manual podman run; --poc-only / --down / --clean; digests to test/e2e/digests.txt even on red runs) |
+| Post-review fixes | C1 host-lib contract gated for container (E2E_HOST=1), I1 digest-on-red fixed, M1 comment accuracy, M3 lifecycle doc — re-review PASS 4/4 |
+| Agent-side verification | static only (sandbox cannot run podman): 82/82 tests, check green, bash -n, YAML parse, sidecar live ws smoke incl. 4001/4002 close codes |
+| **Pending acceptance (user terminal)** | `cd ~/projects/opencode-voice && test/e2e/run-container.sh` — first real podman run of the stack is the R0.2 acceptance; T2 container E2E depends on it |
