@@ -1,0 +1,120 @@
+# R0.2 containerized e2e stack (podman): opencode web v2 + voice sidecar +
+# playwright test runner. Executed in the USER's terminal (agents cannot run
+# containers in their sandbox); one-command wrapper: test/e2e/run-container.sh.
+# Prerequisites and troubleshooting: test/e2e/README.md.
+
+name: voicetest
+
+networks:
+  # dedicated bridge for the stack; deliberately NOT compose `internal: true`
+  # because the e2e service must reach the npm registry for `npm ci`
+  voicetest:
+
+volumes:
+  # container-owned node_modules: `npm ci` inside the playwright image
+  # installs from the repo lockfile WITHOUT touching the host checkout's
+  # node_modules (the brief's "anonymous volume", materialized as a named
+  # project-scoped volume so it survives and is removable via compose)
+  node_modules:
+
+services:
+  # --- opencode web v2 ------------------------------------------------------
+  # upstream publishes no v2 image; community rebuild pinned per task brief.
+  # tag verified via https://hub.docker.com/v2/repositories/guarnacciaa/opencode-v2/tags
+  # (2026-11-10): 2.0.29 exists; newest overall is 2.2.7, newest 2.0.x 2.0.32
+  opencode-web:
+    image: guarnacciaa/opencode-v2:2.0.29
+    environment:
+      OPENCODE_PASSWORD: e2e-voice-secret # basic-auth user is "opencode"
+      OPENCODE_HOSTNAME: 0.0.0.0 # reachable from the voicetest network
+      OPENCODE_PORT: "4096"
+    ports:
+      # host 4096 is held by the live opencode session on this machine, so the
+      # published side maps to 18096 (override with VOICETEST_WEB_PORT); the
+      # in-network address stays http://opencode-web:4096
+      - "${VOICETEST_WEB_PORT:-18096}:4096"
+    volumes:
+      - ../..:/workspace:ro # repo, read-only (manual browser checks only)
+      - ./opencode-config:/root/.config/opencode # minimal offline config
+    healthcheck:
+      # the brief proposed /api/info; that endpoint could not be verified for
+      # the pinned tag offline, so the probe targets the version-proof web
+      # app root under the same basic auth the tests use. wget fallback for
+      # images without curl.
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -u opencode:e2e-voice-secret http://localhost:4096/ 2>/dev/null || wget -qO /dev/null --user=opencode --password=e2e-voice-secret http://localhost:4096/ 2>/dev/null",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+    networks:
+      - voicetest
+
+  # --- voice sidecar --------------------------------------------------------
+  # runs lib/web-transport.js through bin/voice-sidecar.js (see Dockerfile)
+  voice-sidecar:
+    build:
+      context: ../..
+      dockerfile: test/e2e/sidecar.Dockerfile
+    image: voicetest/voice-sidecar:e2e
+    environment:
+      VOICE_TOKEN: e2e-voice-token
+      VOICE_PORT: "9100"
+      FAKE_TRANSCRIBE: "1" # stub STT: container MVP runs without whisper
+      VOICE_TMPDIR: /tmp/voice
+    expose:
+      - "9100" # loopback-only transport; NOT published to the host
+    healthcheck:
+      # lib/web-transport.js answers plain http upgrades with 426
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:9100/').then(r=>process.exit(r.status===426?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    networks:
+      - voicetest
+
+  # --- playwright test runner ----------------------------------------------
+  e2e:
+    image: mcr.microsoft.com/playwright:1.64.1-noble
+    working_dir: /workspace
+    # shares the sidecar's network namespace: the transport binds 127.0.0.1
+    # only (loopback invariant in lib/web-transport.js), so a separate netns
+    # could never reach it. inside the shared netns the sidecar is
+    # ws://127.0.0.1:9100 while opencode-web still resolves via voicetest DNS.
+    network_mode: "service:voice-sidecar"
+    # root in a rootless podman container maps to the host user, so npm ci
+    # into the node_modules volume and test-results/ artifacts both end up
+    # owned by the host account; playwright launches chromium with its
+    # default (sandbox off) launcher, matching the host runs
+    user: root
+    volumes:
+      - ../..:/workspace # RW: artifacts (test-results/) land in the repo
+      - node_modules:/workspace/node_modules
+    environment:
+      BASE_URL: http://opencode-web:4096
+      # consumed by specs directly (process.env), see playwright.config.js;
+      # loopback URL because of the shared network namespace above
+      SIDECAR_WS: ws://127.0.0.1:9100
+      VOICE_TOKEN: e2e-voice-token
+      FIXTURE_WAV: /workspace/tests/e2e/fixtures/german-tone-fixture.wav
+      CI: "1"
+      E2E_HOST: "1" # playwright.config.js branch: skips host-only specs
+    depends_on:
+      opencode-web:
+        condition: service_healthy
+      voice-sidecar:
+        condition: service_started
+    # `... run --rm e2e` semantics: container removed after the run, exit code
+    # passes through (equivalent to up --abort-on-container-exit --exit-code-from e2e)
+    command: >-
+      bash -lc "npm ci --no-audit --no-fund && npx playwright test"
