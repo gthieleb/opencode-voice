@@ -19,14 +19,27 @@
 | (3) Official Playwright MCP Docker image | **BLOCKED: no docker** | task 0b.4 smoke unanswerable until a container runtime exists |
 | (1) Host Node Playwright Test runner | **PARTIAL** | binaries ✔, config + fixture + spec authored; only OS system libs missing (one sudo command) |
 
-## Decision (provisional, pending user input on blocked items)
+## Revision R0.2 — 2026-11-10 (USER DECISION: container-first)
 
-**Primary: Host Node Playwright Test 1.64.1 (option 1), pinned via package.json devDependency.**
-Rationale: only immediately available option; keeps tests in the repo's existing Node/esm tooling (no TS added — config + specs authored as ESM JS); containerization postponed, not abandoned.
+User instruction: further tests use **Docker images for OpenCode web v2 AND Playwright**. Facts enabling it:
 
-**Deliberately deferred (needs user go):**
-- Docker or podman install → would re-open options (2)/(3) for reproducible Chromium E2E (recommended later — reproduce matrix from official Playwright image digest once available).
-- MCP-container audio smoke (0b.4) unanswerable until then; contract: any containerization of E2E lands only as a separate decision with digest pinning.
+| Probe | Result |
+| --- | --- |
+| Podman | **5.7.0 installed** (rootless-capable: kernel `user.max_user_namespaces` unlimited, `unprivileged_userns_clone=1`) |
+| Agent shell | **CANNOT execute containers** (`no-new-privileges` → `podman run` fails with `cannot clone/cannot re-exec`) → all container executions run in the USER's terminal; agents author config/scripts |
+| Docker | not installed; podman is the container runtime (Docker-compat present) |
+| OpenCode v2 image | **upstream publishes NO v2 image**; pinned community image `guarnacciaa/opencode-v2:<tag>` (rebuilt per release, multi-arch). Reference only at digest resolution time. v2 web = `opencode serve` + `OPENCODE_PASSWORD` (Basic auth user `opencode`) |
+| Playwright Test image | official `mcr.microsoft.com/playwright:1.64.1-noble` (pin TAG+digest at adoption; image lacks `@playwright/test` → `npm ci` inside container from the repo lockfile with an anonymous-volume node_modules) |
+
+**Decision:**
+1. **Primary: Podman-compose stack** `test/e2e/compose.yaml`: services (a) `opencode-web` (pinned `guarnacciaa/opencode-v2` tag, workspace repo mount RO, fixed password env, port 4096), (b) `voice-sidecar` (node:24-slim, runs repo `lib/web-transport.js` via a small `bin/voice-sidecar.js`, token env, loopback INSIDE network + published only if needed), (c) `e2e` (pinned Playwright 1.64.1-noble image, mounts repo, `npm ci` + `npx playwright test`, fixture WAV mounted, Chromium fake-mic flags via playwright.config env, `BASE_URL=http://opencode-web:4096`, artifacts dir mount RW). Dedicated podman network; no host-network mode, no privileged, no `--no-sandbox` (Playwright image ships the needed sandbox seccomp profile).
+2. **Host Node Playwright (previous R0 primary) demoted to FALLBACK** for fast iteration and environments without containers. Artifacts already produced stay in use.
+3. MCP-container audio smoke (0b.4) re-evaluated ONLY if needed for interactive debugging; E2E truth stays Playwright Test.
+4. Digest pinning: record digests of both images in this file once first successful pull (user terminal) reports them.
+
+**Execution split (R0.2 constraint):** user runs `podman compose -f test/e2e/compose.yaml run --rm e2e` (or the provided `test/e2e/run-container.sh`); agent reads `test-results/` + evidence and iterates on config/tests. If podman compose driver is absent on the user machine, fall back to three explicit `podman run` commands provided in the same script.
+
+**Status of POC (0b.3):** fixture generator + config + poc spec exist; container POC is the pending acceptance run (user terminal). Chromium OS-libs blocker B1 is **superseded** for the container path (image ships OS deps); host fallback still wants B1.
 
 Artifacts produced for the POC (option 1), reusable either way:
 - `tests/e2e/fixtures/make-fixture.js` → deterministic mono 16 kHz 16-bit WAV tone fixture (`german-tone-fixture.wav`), no model dependency

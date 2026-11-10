@@ -58,13 +58,13 @@
 - [ ] Present **Gate A** report (Implemented/Tested/Risks/Decision requested): reuse points, architecture choice, any proposed upstream patch. **User approval required before UI implementation and before any OpenCode source patch/fork.**
 - Commit: `docs: T0 baseline report and Gate A architecture decision`
 
-### Wave 3 — R0: Test runtime decision (before T1)
-**Files:** Create: `tests/e2e/` skeleton, write decision to `test-runtime-decision.md`, evidence to `test-evidence.md`.
-- [ ] Detect Docker/Podman availability, arch, CI platform. Compare (a) host Playwright Test runner, (b) pinned official Playwright Test image, (c) official Playwright MCP image — separately.
-- [ ] Prove fixture injection: mounted absolute-path WAV + Chromium `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream --use-file-for-fake-audio-capture=…` reaches `getUserMedia`; verify sample format, permissions, container↔host networking, WebSocket reachability.
-- [ ] Decide host vs container; pin image digest/tag and npm version; prefer TypeScript/Node; no Python Playwright, no blanket host installs.
-- [ ] Record **Checkpoint R0**. **No T1/T2 progress without R0 outcome.**
-- Commit: `test: playwright runtime decision and fake-mic POC (R0)`
+### Wave 3 — R0: Test runtime decision (before T1) — **REVISED R0.2, 2026-11-10: container-first per user decision**
+**Files:** Create: `test/e2e/compose.yaml` + `bin/voice-sidecar.js` + `test/e2e/run-container.sh`, decision in `test-runtime-decision.md`, evidence in `test-evidence.md`.
+- [x] Environment probed (2026-11-01): no docker; **podman 5.7.0 present**; agent shell cannot exec containers (`no-new-privileges`) — **user terminal executes containers, agents author everything else.**
+- [ ] **Container stack (primary):** podman compose with (a) OpenCode web v2 = pinned `guarnacciaa/opencode-v2` tag (upstream publishes no v2 image; reference at adoption), (b) `mcr.microsoft.com/playwright:1.64.1-noble` pinned with digest after first pull, (c) `voice-sidecar` container (node:24-slim + repo `lib/web-transport.js`); single podman network, no privileged, no host networking, no `--no-sandbox`; fixtures RO, artifacts RW; `npm ci` inside e2e container (image lacks `@playwright/test`).
+- [ ] Prove fixture injection inside container: WAV + Chromium fake-mic flags → `getUserMedia` → sidecar WebSocket → STT injection point; validate sample format, container networking, artifacts, cleanup.
+- [ ] Host Node Playwright (1.64.1) demoted to fallback (needs B1 OS libs in host); MCP-image smoke only for interactive debugging if justified.
+- [ ] Record **Checkpoint R0.2** and digests in `test-runtime-decision.md`. POC run = user terminal; agent consumes `test-results/`.
 
 ### Wave 4 — T1: Transport + transcription contract (before any web UI)
 **Files:** Create: `lib/web-transport.js`, `lib/audio-validate.js`, tests in `test/web/`.
@@ -79,7 +79,7 @@
 - [ ] Browser media capture, codec/WAV adaptation, stop/cancel cleanup (tracking mic tracks, sockets, temp files). *(2.3)*
 - [ ] Native-looking mic button with states idle/permission/recording/transcribing/ready/denied/error, native Icon/IconButton, accessible labels, dark/light. *(2.4)*
 - [ ] Raw/normalized editable preview; explicit manual submit only. *(2.5)*
-- [ ] Playwright Test E2E (fake mic + WAV fixture): mic visible, permission flow, start/stop/cancel, transcript appears as editable draft, **zero session messages before manual send**. *(T2, 3.3)*
+- [ ] Playwright Test E2E **inside the pinned container stack (R0.2)**; host runner only as fallback (fake mic + WAV fixture): mic visible, permission flow, start/stop/cancel, transcript appears as editable draft, **zero session messages before manual send**. *(T2, 3.3)*
 - [ ] Playwright MCP interactive smoke; record whether current MCP version supports audio-input flags; document limitation honestly. *(3.4, T2)*
 - Commit: `feat: browser mic capture, composer button and editable draft (T2)`
 
