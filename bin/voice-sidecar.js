@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // voice sidecar launcher (R0.2 container stack): wraps lib/web-transport.js
 // for the podman e2e stack. env:
 //   VOICE_PORT       ws port (default 9100)
