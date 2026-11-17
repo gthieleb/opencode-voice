@@ -1,6 +1,6 @@
 {
   "name": "@renjfk/opencode-voice",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "description": "Speech-to-text and text-to-speech for OpenCode. Record voice prompts with whisper-cpp, hear responses via Piper TTS, with LLM normalization through any OpenAI-compatible endpoint.",
   "keywords": [
     "opencode",
@@ -18,10 +18,14 @@
     "type": "git",
     "url": "git+https://github.com/renjfk/opencode-voice.git"
   },
+  "bin": {
+    "opencode-voice-sidecar": "./bin/voice-sidecar.js"
+  },
   "files": [
     "index.js",
     "lib",
-    "gui"
+    "gui",
+    "bin"
   ],
   "type": "module",
   "main": "index.js",
@@ -29,14 +33,23 @@
     "./tui": {
       "import": "./index.js"
     },
-    "./gui-experimental": "./gui/gui-experimental.cjs"
+    "./gui-experimental": "./gui/gui-experimental.cjs",
+    "./web-transport": {
+      "import": "./lib/web-transport.js"
+    },
+    "./audio-validate": {
+      "import": "./lib/audio-validate.js"
+    }
   },
   "scripts": {
     "lint": "npx oxlint .",
     "fmt": "npx oxfmt --check .",
     "fmt:fix": "npx oxfmt --write .",
     "test": "node --test",
+    "test:e2e": "test/e2e/run-container.sh",
+    "test:e2e:poc": "test/e2e/run-container.sh --poc-only",
     "check": "npm run lint && npm run fmt",
+    "prepare:precommit": "pre-commit install",
     "prepack": "npm run check"
   },
   "devDependencies": {

@@ -1,0 +1,65 @@
+# Pre-commit gates for opencode-voice.
+#
+# Mirrors the repo's own `npm run check` (oxfmt --check + oxlint) so a commit
+# can never introduce formatting or lint drift that CI would then reject, and
+# adds secret/hygiene checks that `npm run check` cannot do.
+#
+# Install once per clone:
+#   pre-commit install
+#
+# Run against everything:
+#   pre-commit run -a
+default_install_hook_types: [pre-commit]
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+        exclude: ^(package-lock\.json|test/e2e/digests\.txt)$
+      - id: trailing-whitespace
+        exclude: ^package-lock\.json$
+      - id: check-yaml
+      - id: check-json
+        exclude: ^(package-lock\.json|test-results/.*)$
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+        exclude: ^(test/e2e/fixtures/.*\.wav|tests/e2e/fixtures/.*\.wav)$
+      - id: detect-private-key
+
+  # The repo's own formatter and linter, run through the pinned local
+  # devDependencies rather than a mirrored version, so the hook and
+  # `npm run check` can never disagree.
+  - repo: local
+    hooks:
+      - id: oxfmt
+        name: oxfmt --check
+        entry: npx oxfmt --check
+        language: system
+        types: [text]
+        pass_filenames: false
+      - id: oxlint
+        name: oxlint
+        entry: npx oxlint .
+        language: system
+        types: [javascript]
+        pass_filenames: false
+
+      # Node unit + contract tests. Fast enough for every commit; the
+      # Playwright specs are excluded (they need the pinned browser image and
+      # run in CI's container job instead).
+      - id: node-test
+        name: node --test (unit + contracts)
+        entry: node --test
+        language: system
+        types: [javascript]
+        pass_filenames: false
+        stages: [pre-commit]
+
+exclude: ^(node_modules/|test-results/|package-lock\.json|\.opencode/)
