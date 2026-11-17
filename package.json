@@ -52,12 +52,14 @@
     "prepare:precommit": "pre-commit install",
     "prepack": "npm run check"
   },
+  "dependencies": {
+    "ws": "^8.22.1"
+  },
   "devDependencies": {
     "@opencode/plugin": "^2.2.1",
     "@playwright/test": "^1.64.1",
     "oxfmt": "0.50.0",
     "oxlint": "1.65.0",
-    "solid-js": "^1.9.0",
-    "ws": "^8.22.1"
+    "solid-js": "^1.9.0"
   }
 }
