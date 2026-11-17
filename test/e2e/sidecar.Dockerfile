@@ -4,12 +4,11 @@ FROM node:24-slim
 
 WORKDIR /app
 
-# deps first for layer caching. npm ci WITHOUT --omit=dev is intentional:
-# ws lives in devDependencies (task 4c note: "runtime resolution must be
-# guaranteed"), so --omit=dev would break `import { WebSocket } from "ws"`
-# in lib/web-transport.js. we keep the full dev tree (oxlint, playwright pkg,
-# solid-js) instead of pruning or cherry-picking: plain `npm ci` is the only
-# lockfile-pure, reproducible acquisition of ws here.
+# deps first for layer caching. ws is a real runtime dependency now (it moved
+# from devDependencies after a packed-tarball install proved the missing
+# module), so --omit=dev would still resolve it. We keep plain `npm ci`
+# without the flag anyway: it is the lockfile-pure acquisition path this image
+# always used, and changing the flag is not needed for correctness.
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
