@@ -50,69 +50,208 @@ const VoiceIpc = Ipc.define({
   },
 });
 
-const SPIKE_DRAFT_TEXT = "voice spike draft";
-
 // Popover content for the "Voice" pill. Rendered by the host each time the
 // popover opens, under the plugin's Solid owner; the host calls `menu` with
-// { session, screen, close } (ignored here — the spike reads ctx directly).
-function voicePopover(ctx) {
+// { session, screen, close } (ignored here — the surface reads ctx directly).
+//
+// Task 2.4: the record surface. This is the *UI* half — it owns the buttons
+// and the state rendering and delegates all capture work to the bundle's own
+// startBrowserCapture (W5.2 section 4, same file, so no cross-file require).
+// It never writes to the composer; that is task 2.5's preview surface.
+//
+// The transport config ({ url, token }) comes from the plugin's main-entry
+// Ipc. On the served web app that entry never runs (finding F2, W5.1), so the
+// surface takes an injected config and the web build must supply one via
+// window.__OPENCODE_VOICE_TRANSPORT__ (a same-origin bootstrap endpoint, task
+// 2.6). Until then the record button reports why it cannot start, rather than
+// hanging on an Ipc call that will never answer.
+function readTransportConfig(ctx) {
+  // Desktop: the real Ipc. Returns a promise.
+  if (ctx.app.platform === "desktop") {
+    return Promise.resolve(ctx.main(VoiceIpc).config());
+  }
+  // Web: the main entry does not run, so a page-injected config is the only
+  // source. Absent means "not configured yet" — a named, visible state.
+  const injected = globalThis.__OPENCODE_VOICE_TRANSPORT__;
+  if (injected && typeof injected.url === "string" && typeof injected.token === "string") {
+    return Promise.resolve({ url: injected.url, token: injected.token });
+  }
+  return Promise.resolve(null);
+}
+
+// The pill's label/icon follow the capture state (task 2.4 state surface).
+// Kept as a pure function so the contract test can assert every mapping
+// without a browser.
+const PILL_VIEWS = {
+  idle: { icon: "waveform", key: "pill" },
+  permission: { icon: "waveform", key: "statePermission" },
+  recording: { icon: "stop", key: "stateRecording" },
+  transcribing: { icon: "loader", key: "stateTranscribing" },
+  ready: { icon: "waveform", key: "stateReady" },
+  denied: { icon: "warning", key: "stateDenied" },
+  error: { icon: "warning", key: "stateError" },
+};
+
+function pillView(state) {
+  return PILL_VIEWS[state] ?? PILL_VIEWS.idle;
+}
+
+function voicePopover(ctx, stateRef) {
   const root = document.createElement("div");
   root.className = "opencode-voice-popover";
   root.setAttribute("data-testid", "voice-popover");
 
-  // Requirement 4 (W5.1): the window entry reads the main-entry Ipc through
-  // ctx.main(token). Per the SDK (gui/context.d.ts): on the web an IpcClient
-  // call waits indefinitely while the plugin's main entry is off — and on the
-  // served web app (v2.2.5) it never runs, `main` executes only in the
-  // desktop app's main process. Firing the call on web would therefore hang
-  // the status on "loading" forever, so the web branch proves the client
-  // interface is present instead; on desktop the same code renders the stub
-  // { url, token }.
   const status = document.createElement("p");
   status.className = "opencode-voice-ipc-status";
   status.setAttribute("data-testid", "voice-ipc-status");
   root.appendChild(status);
 
-  if (ctx.app.platform === "desktop") {
-    status.textContent = ctx.t("ipcLoading");
-    const voice = ctx.main(VoiceIpc);
-    void voice.config().then(
-      (config) => {
-        status.textContent = ctx.t("ipcOk", {
-          url: config.url,
-          token: config.token,
-        });
-      },
-      (cause) => {
-        status.textContent = ctx.t("ipcUnavailable", {
-          error: String(cause),
-        });
-      },
-    );
-  } else {
-    const voice = ctx.main(VoiceIpc);
-    status.textContent = ctx.t("ipcWeb", {
-      hasConfig: typeof voice.config === "function" ? "yes" : "no",
-      hasPing: typeof voice.ping === "function" ? "yes" : "no",
+  const stateLine = document.createElement("p");
+  stateLine.className = "opencode-voice-state";
+  stateLine.setAttribute("data-testid", "voice-state");
+  root.appendChild(stateLine);
+
+  let capture = null;
+
+  function render(state) {
+    stateRef.state = state;
+    stateLine.textContent = ctx.t(pillView(state).key);
+    stateLine.setAttribute("data-state", state);
+    if (state === "recording") {
+      status.textContent = ctx.t("hintStop");
+    } else if (state === "transcribing") {
+      status.textContent = ctx.t("hintTranscribing");
+    } else if (state === "denied") {
+      status.textContent = ctx.t("hintDenied");
+    } else if (state === "error") {
+      status.textContent = ctx.t("hintRetry");
+    } else if (state === "ready") {
+      status.textContent = ctx.t("hintReview");
+    } else {
+      status.textContent = ctx.t("hintIdle");
+    }
+  }
+
+  function beginCapture() {
+    void readTransportConfig(ctx).then((config) => {
+      if (!config) {
+        status.textContent = ctx.t("hintNotConfigured");
+        stateLine.setAttribute("data-state", "unconfigured");
+        return;
+      }
+      capture = startBrowserCapture({
+        url: config.url,
+        token: config.token,
+        onStateChange: (state) => render(state),
+        onResult: (result) => {
+          // Remember it for a reopened popover, then let the surface's own
+          // preview handler (installed below) show it. Never writes to the
+          // composer — that is the Insert button's job.
+          stateRef.lastResult = result;
+          stateRef.onResult?.(result);
+        },
+        onError: () => {
+          capture = null;
+        },
+      });
     });
   }
 
-  // Requirement 3 (W5.1): composer write access (PR #59469 surface).
-  // `ctx.screen.current()` is the mounted session screen; `input.screen` is
-  // the equivalent route-following reference the pill receives.
-  const writeDraft = createComponent(ctx.ui.Button, {
+  function stopCapture() {
+    if (capture) capture.stop();
+  }
+
+  function cancelCapture() {
+    if (capture) {
+      capture.cancel();
+      capture = null;
+    }
+    render("idle");
+  }
+
+  // Task 2.5: the editable preview. The transcript lands here first and is
+  // never written to the composer until the person presses Insert. This is
+  // the proposal's hard product contract ("never submit a voice transcript to
+  // the agent automatically"), so nothing in this file may call setText on a
+  // result — only on this button's click.
+  const preview = document.createElement("textarea");
+  preview.className = "opencode-voice-preview";
+  preview.setAttribute("data-testid", "voice-preview");
+  preview.setAttribute("data-empty", "true");
+  root.appendChild(preview);
+
+  function showPreview(text) {
+    preview.value = text;
+    preview.textContent = text;
+    preview.setAttribute("data-empty", text ? "false" : "true");
+  }
+
+  // Insert is disabled until there is reviewable text: an empty preview must
+  // never reach the composer as an accidental no-op submit.
+  const insert = createComponent(ctx.ui.Button, {
+    icon: "check",
+    variant: "submit",
+    size: "small",
+    class: "opencode-voice-insert",
+    "data-testid": "voice-insert",
+    disabled: true,
+    children: ctx.t("insert"),
+    onClick: () => {
+      const text = preview.value ?? "";
+      if (!text.trim()) return;
+      ctx.screen.current()?.composer.setText(text);
+      showPreview("");
+      insert.disabled = true;
+      render("idle");
+    },
+  });
+  root.appendChild(insert);
+
+  const record = createComponent(ctx.ui.Button, {
     icon: "waveform",
     variant: "neutral",
     size: "small",
-    class: "opencode-voice-write-draft",
-    "data-testid": "voice-write-draft",
-    children: ctx.t("writeDraft"),
+    class: "opencode-voice-record",
+    "data-testid": "voice-record",
+    children: ctx.t("record"),
     onClick: () => {
-      ctx.screen.current()?.composer.setText(SPIKE_DRAFT_TEXT);
+      if (stateRef.state === "recording") stopCapture();
+      else if (stateRef.state === "idle" || stateRef.state === "ready") beginCapture();
     },
   });
-  root.appendChild(writeDraft);
+  root.appendChild(record);
 
+  const cancel = createComponent(ctx.ui.Button, {
+    icon: "xmark-small",
+    variant: "ghost",
+    size: "small",
+    class: "opencode-voice-cancel",
+    "data-testid": "voice-cancel",
+    children: ctx.t("cancel"),
+    onClick: () => {
+      cancelCapture();
+      showPreview("");
+      insert.disabled = true;
+    },
+  });
+  root.appendChild(cancel);
+
+  // Wire the result into the preview exactly once, through stateRef so a
+  // popover reopened after a capture still shows the pending transcript.
+  const baseOnResult = stateRef.onResult;
+  stateRef.onResult = (result) => {
+    const text = result?.normalizedText || result?.rawText || "";
+    showPreview(text);
+    insert.disabled = !text.trim();
+    if (baseOnResult) baseOnResult(result);
+  };
+  if (stateRef.lastResult) {
+    const text = stateRef.lastResult.normalizedText || stateRef.lastResult.rawText || "";
+    showPreview(text);
+    insert.disabled = !text.trim();
+  }
+
+  render(stateRef.state);
   return root;
 }
 
@@ -120,27 +259,41 @@ module.exports.default = Plugin.define({
   i18n: {
     en: {
       pill: "Voice",
-      title: "Voice input (W5.1 spike)",
-      ipcLoading: "voice ipc: loading",
-      ipcOk: "voice ipc: {{url}} (token: {{token}})",
-      ipcUnavailable: "voice ipc unavailable: {{error}}",
-      ipcWeb:
-        "web platform: main entry is desktop-only; Ipc client present (config: {{hasConfig}}, ping: {{hasPing}})",
-      writeDraft: "Write spike draft",
+      title: "Voice input",
+      record: "Record",
+      cancel: "Cancel",
+      insert: "Insert",
+      hintReview: "Review the transcript, then press Insert.",
+      hintIdle: "Hold nothing — press Record, speak, then Stop.",
+      hintStop: "Recording. Press Record again to stop.",
+      hintTranscribing: "Transcribing…",
+      hintDenied: "Microphone blocked. Allow it in the browser's site settings.",
+      hintRetry: "The last capture failed. Press Record to try again.",
+      hintNotConfigured: "Voice transport is not configured for this page.",
+      statePermission: "Voice: asking for the microphone",
+      stateRecording: "Voice: recording",
+      stateTranscribing: "Voice: transcribing",
+      stateReady: "Voice: transcript ready",
+      stateDenied: "Voice: microphone blocked",
+      stateError: "Voice: failed",
     },
   },
   // Window entry: register the "Voice" ComposerPill in the lane above the
   // session composer. `show` is re-run by the host when what it reads
-  // changes (W5.3 makes the icon/label follow the recording state here).
+  // changes, so the icon and label follow the capture state (task 2.4).
   setup(ctx) {
+    // Shared with the popover so the pill and the surface cannot disagree.
+    // Exposed for the contract test; the host never reads it.
+    const stateRef = { state: "idle", lastResult: null };
+    ctx._voiceStateRef = stateRef;
     ctx.add(ComposerPill, {
       id: "voice",
       show: () => ({
-        label: ctx.t("pill"),
-        icon: "waveform",
+        label: ctx.t(pillView(stateRef.state).key),
+        icon: pillView(stateRef.state).icon,
         title: ctx.t("title"),
       }),
-      menu: () => voicePopover(ctx),
+      menu: () => voicePopover(ctx, stateRef),
     });
   },
   // Main entry: provide the Ipc stub. Runs in the desktop app's main
@@ -930,3 +1083,9 @@ function startBrowserCapture(deps) {
 }
 
 module.exports.__browser = { startBrowserCapture, SERVER_DEFAULT_LIMITS, MIME_CANDIDATES };
+
+// Task 2.4: the pill's state->view mapping is pure and host-free, so the
+// contract test asserts every capture state has a label and icon without a
+// browser or a mounted pill.
+module.exports.__pillView = pillView;
+module.exports.__PILL_VIEWS = PILL_VIEWS;

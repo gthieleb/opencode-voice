@@ -39,8 +39,7 @@ import { fileURLToPath } from "node:url";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BUNDLE_PATH = path.join(REPO_ROOT, "gui", "gui-experimental.cjs");
 const PLUGIN_ID = "@renjfk/opencode-voice";
-const PILL_TITLE = "Voice input (W5.1 spike)";
-const SPIKE_DRAFT_TEXT = "voice spike draft";
+const PILL_TITLE = "Voice input";
 
 // The app's fixed require-map ids whose resolution is NOT asserted here
 // (node builtins + electron resolve to inert proxies in the app; anything
@@ -96,6 +95,44 @@ globalThis.document = { createElement: (tag) => makeElement(tag) };
 
 let sdkPromise;
 let cachedDef;
+let cachedExports;
+
+/**
+ * Children are two shapes in this harness: raw DOM elements from
+ * document.createElement (id under `attrs`) and component props returned by
+ * the createComponent stub (id directly on the object). Both are searched.
+ */
+function findById(root) {
+  return (id) =>
+    root.children.find(
+      (child) => child && (child.attrs?.["data-testid"] === id || child["data-testid"] === id),
+    );
+}
+
+/**
+ * Returns the bundle's full `module.exports` (not just the default definition)
+ * so tests can reach the pure helper sections (__pillView, __capture, ...).
+ */
+function loadRawExports() {
+  if (cachedExports) return cachedExports;
+  const known = {
+    "@opencode/plugin/gui": { Plugin: { define: (d) => d }, Ipc: { define: (d) => d } },
+    "solid-js": { createComponent: (component, props) => component(props) },
+    effect: {
+      Schema: { Struct: (fields) => ({ kind: "struct", fields }), String: {}, Boolean: {} },
+    },
+  };
+  const req = (id) => {
+    if (known[id]) return known[id];
+    if (id.startsWith("node:") || INERT_IDS.has(id)) return inertModule(id);
+    throw new Error(`bundle requires an id outside the app's fixed map: ${id}`);
+  };
+  const code = readFileSync(BUNDLE_PATH, "utf8");
+  const moduleObj = { exports: {} };
+  new Function("require", "module", "exports", code)(req, moduleObj, moduleObj.exports);
+  cachedExports = moduleObj.exports;
+  return cachedExports;
+}
 
 /**
  * Evaluates the real bundle file the same way the app does:
@@ -200,7 +237,7 @@ test("bundle evaluates under the app's CJS contract and declares the surface", a
   assert.ok(def.i18n?.en?.title === PILL_TITLE, "i18n catalog carries the pill title");
 });
 
-test("setup registers one ComposerPill with the expected view (web branch)", async () => {
+test("setup registers one ComposerPill with the idle view (task 2.4)", async () => {
   const def = await loadBundle();
   const sdk = await import("@opencode/plugin/gui");
   const ctx = makeCtx(def, { platform: "web" });
@@ -210,42 +247,156 @@ test("setup registers one ComposerPill with the expected view (web branch)", asy
   assert.equal(ctx._added[0].registry, sdk.ComposerPill, "registry is the SDK ComposerPill");
   const pill = ctx._added[0].item;
   assert.equal(pill.id, "voice");
-  const view = pill.show({ session: {}, screen: {} });
-  assert.deepEqual(view, {
+
+  // A freshly mounted pill renders the idle view.
+  assert.deepEqual(pill.show({ session: {}, screen: {} }), {
     label: "Voice",
     icon: "waveform",
     title: PILL_TITLE,
   });
 
-  // The popover renders the web-branch status (main entry is desktop-only)
-  // and the write-draft button.
+  // The popover carries the record surface: an idle hint, a state line, and
+  // the Record / Cancel buttons.
   const root = pill.menu({ session: {}, screen: {}, close: () => {} });
   assert.equal(root.attrs["data-testid"], "voice-popover");
-  const [status, button] = root.children;
-  assert.equal(
-    status.textContent,
-    "web platform: main entry is desktop-only; Ipc client present (config: yes, ping: yes)",
-  );
-  assert.equal(button["data-testid"], "voice-write-draft");
-
-  // Clicking the action writes the spike draft through the screen's composer.
-  button.onClick();
-  assert.deepEqual(ctx._setTextCalls, [SPIKE_DRAFT_TEXT]);
+  const byTestId = findById(root);
+  assert.equal(byTestId("voice-state").attrs["data-state"], "idle");
+  assert.equal(byTestId("voice-state").textContent, "Voice");
+  assert.equal(byTestId("voice-record").children, "Record");
+  assert.equal(byTestId("voice-cancel").children, "Cancel");
 });
 
-test("desktop branch resolves the Ipc stub; main provides it", async () => {
+test("pill view follows every capture state (pure mapping)", async () => {
+  const def = await loadBundle();
+  const mod = loadRawExports();
+  // The pill's view is derived from the capture state machine's own states,
+  // so every state the machine can reach has a defined view.
+  for (const state of mod.__capture.CAPTURE_STATES) {
+    assert.ok(def.i18n.en[mod.__pillView(state).key], `state ${state} has an i18n label`);
+    assert.equal(typeof mod.__pillView(state).icon, "string", `state ${state} has an icon`);
+  }
+  // An unknown state never throws and falls back to idle.
+  assert.deepEqual(mod.__pillView("not-a-state"), mod.__pillView("idle"));
+});
+
+test("record with no transport config reports it instead of hanging (web)", async () => {
+  const def = await loadBundle();
+  const ctx = makeCtx(def, { platform: "web" });
+  def.setup(ctx);
+  const pill = ctx._added[0].item;
+  const root = pill.menu({ session: {}, screen: {}, close: () => {} });
+  const byTestId = findById(root);
+
+  // No window.__OPENCODE_VOICE_TRANSPORT__ on the web: the button must say so
+  // rather than await an Ipc call that never resolves (finding F2).
+  delete globalThis.__OPENCODE_VOICE_TRANSPORT__;
+  byTestId("voice-record").onClick();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(byTestId("voice-state").attrs["data-state"], "unconfigured");
+  assert.equal(byTestId("voice-ipc-status").textContent, ctx.t("hintNotConfigured"));
+});
+
+test("a result lands in the preview and is NOT written to the composer (task 2.5)", async () => {
+  const def = await loadBundle();
+  const ctx = makeCtx(def, { platform: "web" });
+  def.setup(ctx);
+  const pill = ctx._added[0].item;
+  const root = pill.menu({ session: {}, screen: {}, close: () => {} });
+  const byTestId = findById(root);
+  const preview = byTestId("voice-preview");
+  const insert = byTestId("voice-insert");
+
+  // The product contract from the proposal: a transcript is never submitted
+  // automatically. Delivering a result must leave the composer untouched.
+  assert.equal(preview.attrs["data-empty"], "true", "preview starts empty");
+  assert.equal(insert.disabled, true, "Insert is disabled with nothing to review");
+
+  // Deliver a result the way the capture client does: the popover installs
+  // its handler on the shared state object, and startBrowserCapture calls
+  // stateRef.onResult(result). Re-mounting reads the same shared state, which
+  // is how a reopened popover shows a pending transcript.
+  const stateRef = ctx._voiceStateRef;
+  assert.ok(stateRef, "the popover exposes the shared capture state");
+  stateRef.lastResult = { rawText: "open the file", normalizedText: "Open the file." };
+
+  const reopened = pill.menu({ session: {}, screen: {}, close: () => {} });
+  const reopenedPreview = findById(reopened)("voice-preview");
+  const reopenedInsert = findById(reopened)("voice-insert");
+
+  assert.equal(reopenedPreview.value, "Open the file.", "normalized text wins");
+  assert.equal(reopenedInsert.disabled, false, "Insert enables once there is text");
+  assert.deepEqual(ctx._setTextCalls, [], "delivering a result writes nothing to the composer");
+
+  // Insert with an empty preview is a no-op even if clicked.
+  preview.value = "";
+  preview.textContent = "";
+  insert.disabled = false;
+  insert.onClick();
+  assert.deepEqual(ctx._setTextCalls, [], "empty Insert writes nothing");
+});
+
+test("Insert writes exactly the reviewed text, once (task 2.5)", async () => {
+  const def = await loadBundle();
+  const ctx = makeCtx(def, { platform: "web" });
+  def.setup(ctx);
+  const pill = ctx._added[0].item;
+  const root = pill.menu({ session: {}, screen: {}, close: () => {} });
+  const byTestId = findById(root);
+  const preview = byTestId("voice-preview");
+  const insert = byTestId("voice-insert");
+
+  // A person edits the preview before inserting; what they see is what goes.
+  preview.value = "click the Settings icon, then Export";
+  insert.disabled = false;
+  insert.onClick();
+  assert.deepEqual(ctx._setTextCalls, ["click the Settings icon, then Export"]);
+  assert.equal(preview.value, "", "preview clears after insert");
+  assert.equal(insert.disabled, true, "Insert re-disables");
+
+  // Clicking again writes nothing more: insert is not a submit loop.
+  insert.onClick();
+  assert.deepEqual(ctx._setTextCalls, ["click the Settings icon, then Export"]);
+});
+
+test("desktop branch reads the Ipc config; main provides it", async () => {
   const def = await loadBundle();
   const ctx = makeCtx(def, { platform: "desktop" });
   def.setup(ctx);
   const pill = ctx._added[0].item;
 
   const root = pill.menu({ session: {}, screen: {}, close: () => {} });
-  const status = root.children[0];
-  assert.equal(status.textContent, "voice ipc: loading");
-  assert.equal(ctx._mainTokens.length, 1, "popover called ctx.main exactly once");
+  const record = findById(root)("voice-record");
+
+  // This test covers the config hand-off, not capture: Node has no
+  // navigator.mediaDevices, so a real getUserMedia would throw. Pin that the
+  // surface reaches getUserMedia (i.e. the config was accepted and capture
+  // began) without asserting anything about the microphone itself.
+  // Node 24 exposes `navigator` as a getter-only global, so it is replaced
+  // through defineProperty and restored to its original descriptor after.
+  const navDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  let getUserMediaCalled = false;
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    writable: true,
+    value: {
+      mediaDevices: {
+        getUserMedia: () => {
+          getUserMediaCalled = true;
+          return Promise.reject(new Error("test stub: no microphone"));
+        },
+      },
+    },
+  });
+  try {
+    record.onClick();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  } finally {
+    if (navDescriptor) Object.defineProperty(globalThis, "navigator", navDescriptor);
+    else delete globalThis.navigator;
+  }
+  assert.equal(ctx._mainTokens.length, 1, "record called ctx.main exactly once");
   assert.equal(ctx._mainTokens[0].id, `${PLUGIN_ID}.voice`);
-  await new Promise((resolve) => setTimeout(resolve, 10));
-  assert.equal(status.textContent, "voice ipc: ws://localhost:0 (token: stub)");
+  assert.equal(getUserMediaCalled, true, "config was accepted and capture started");
 
   // The main entry provides the Ipc implementation (desktop main process).
   const mainCtx = makeCtx(def, { platform: "desktop" });
