@@ -95,3 +95,18 @@ Agent task 1.1 + 1.2 + 1.3 inventory source locations: see tasks 1.4/1.5 researc
 | Post-review fixes | C1 host-lib contract gated for container (E2E_HOST=1), I1 digest-on-red fixed, M1 comment accuracy, M3 lifecycle doc — re-review PASS 4/4 |
 | Agent-side verification | static only (sandbox cannot run podman): 82/82 tests, check green, bash -n, YAML parse, sidecar live ws smoke incl. 4001/4002 close codes |
 | **Pending acceptance (user terminal)** | `cd ~/projects/opencode-voice && test/e2e/run-container.sh` — first real podman run of the stack is the R0.2 acceptance; T2 container E2E depends on it |
+
+### Wave 1–3 (2026-11-15) — CI gates, task 2.4, task 2.5
+
+| Item | Result |
+| --- | --- |
+| Pre-commit | `.pre-commit-config.yaml` added (gitleaks, pre-commit-hooks hygiene, `oxfmt --check`, `oxlint`, `node --test`) and **installed** (`pre-commit install` → `.git/hooks/pre-commit`). `pre-commit run -a`: **11/11 Passed**. Tool pinned at 4.2.0 standalone (`.local/share/pre-commit/pre-commit.pyz`); the system Python has no pip/ensurepip, so the venv route was unavailable. |
+| CI workflow | `.github/workflows/ci.yml`: `npm ci` instead of `npm install` (+ npm cache), new `e2e` job running `npm run test:e2e:poc` on the pinned Playwright image with `upload-artifact@v4` for `test-results/` + `playwright-report/`. |
+| **Correction to an earlier claim** | `node --test` collects **`*.test.js` only** — the Playwright `*.spec.js` files were never run by `npm test`, in CI or locally. The earlier concern "CI will try Playwright in a bare runner" was **wrong**; the real gap was that browser E2E ran in no job at all. Now covered by the `e2e` job. |
+| package.json | `test:e2e`, `test:e2e:poc`, `prepare:precommit` scripts added. |
+| Task 2.4 | Record surface in the pill popover; `PILL_VIEWS` maps all 7 capture states to icon+i18n label; `readTransportConfig` (desktop Ipc / web injected config); explicit `unconfigured` state. |
+| Task 2.5 | `voice-preview` textarea + `voice-insert`; `normalizedText` preferred; Insert disabled while empty; clears after insert. No auto-submit by construction. |
+| Tests | `npm test` **86/86** (was 82; +4 contract tests). `npm run check` green. |
+| Contract tests changed | `tests/w51-gui-contract.test.js` moved from the W5.1 spike surface to 2.4/2.5 (5 → 7 tests). Two harness notes recorded in the file: children are mixed raw-DOM (`attrs`) and component-props (direct) shapes, and Node 24 exposes `navigator` as a getter-only global (replaced via `defineProperty`, restored after). |
+| **Not verified (honest limit)** | `podman info` fails in this sandbox (`cannot clone: Operation not permitted`), so the `e2e` CI job's real run is unproven here — same known limit as R0.2. The workflow is syntax-checked and its command (`bash -n` + npm script resolution) is verified; the first green Actions run is the proof. |
+| Hex evaluation | `hex-evaluation.md` added: headless/WebSocket/mic/session/RAG findings with sources. Decision: **deferred**. |

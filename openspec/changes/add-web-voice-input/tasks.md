@@ -16,8 +16,8 @@
 - [x] 2.1 Extract narrow shared transcription interface only if required; preserve TUI behavior and fallback.
 - [ ] 2.2 Build authenticated, origin-restricted, bounded same-origin voice transport; reuse existing Whisper/STT adapter. *(DONE 2026-11-02 — `lib/web-transport.js` + `lib/audio-validate.js`, L3 security PASS; evidence: test-evidence.md T1 block)*
 - [x] 2.3 Implement browser media capture, codec adaptation and stop/cancel cleanup. *(DONE 2026-11-07 — `gui/gui-experimental.cjs` sections `__audio`/`__capture`/`__ws`/`__browser`; Node contract + real-transport integration `tests/w52-capture-contract.test.js`; Chromium fake-mic stop/cancel proof `tests/e2e/w52-capture.spec.js`; evidence: test-evidence.md W5.2 block, report `.superpowers/sdd/plan/task-w52-report.md`)*
-- [ ] 2.4 Add native-looking microphone button and states to supported composer extension point.
-- [ ] 2.5 Display raw/normalized transcription with editable preview and explicit user submit only.
+- [x] 2.4 Add native-looking microphone button and states to supported composer extension point. *(DONE 2026-11-15 — `gui/gui-experimental.cjs`: `voicePopover` record surface (Record/Stop/Cancel), `PILL_VIEWS`/`pillView` state→icon+label for all 7 capture states, transport config read (`readTransportConfig`: desktop Ipc / web `__OPENCODE_VOICE_TRANSPORT__`), explicit `unconfigured` state instead of a hanging Ipc call. Tests: 4 in `tests/w51-gui-contract.test.js` incl. "web with no config never hangs" and "config accepted → getUserMedia reached".)*
+- [x] 2.5 Display raw/normalized transcription with editable preview and explicit user submit only. *(DONE 2026-11-15 — `voice-preview` textarea + `voice-insert` button; `normalizedText` wins over `rawText`; Insert disabled until there is text; writes exactly the reviewed text via `composer.setText` and clears. **No auto-submit**: asserted in "a result lands in the preview and is NOT written to the composer".)*
 - [ ] 2.6 Document configuration, supported browsers, permissions, deployment and reverse-proxy requirements.
 
 ## Checkpoint B — MVP demonstration (acceptance gate; tasks 2.7–2.10, formerly B.1–B.4)
@@ -28,8 +28,8 @@
 
 ## 3. Tests and quality
 - [x] 3.1 Extend existing unit/integration tests for TUI regression, session isolation, fallback and audio validation.
-- [ ] 3.2 Prepare at least 20 Piper-generated German coding utterance fixtures, references and provenance; expand to 50–100 after first pass.
-- [ ] 3.3 Execute Playwright Test browser E2E with fake microphone WAV; check draft versus actual submitted session message.
+- [ ] 3.2 Prepare at least 20 Piper-generated German coding utterance fixtures, references and provenance; expand to 50–100 after first pass. *(OPEN — decision recorded: committed WAVs with provenance, no generation step; Piper is not installed here (`which piper` empty). Blocked on nothing technical.)*
+- [ ] 3.3 Execute Playwright Test browser E2E with fake microphone WAV; check draft versus actual submitted session message. *(OPEN — depends on 3.2 for real fixtures and on the R0.2 `--poc-only` CI job landing; the fake-mic POC spec already exists and passes host-side.)*
 - [ ] 3.4 Verify Playwright MCP audio-input flags in installed server version and record repeatable configuration.
 - [ ] 3.5 Test TTS audio artifact generation and optionally browser playback without assuming MCP speaker loopback.
 - [ ] 3.6 Add benchmark report WER/CER, technical term recall, critical errors, raw versus normalized comparison and timings.
